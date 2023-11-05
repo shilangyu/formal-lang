@@ -14,5 +14,11 @@
 *latexmk
 *.synctex.gz
 
+# bibtex
+*.bcf
+*.blg
+*.bbl
+*.run.xml
+
 # output pdf
 *.pdf

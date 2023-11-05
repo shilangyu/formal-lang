@@ -6,8 +6,11 @@
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage[margin=3cm]{geometry}
+\usepackage{biblatex}
+\usepackage{hyperref}
 
 \graphicspath{{./assets}}
+\addbibresource{references.bib}
 
 \title{Formally verifying properties of a toy language\\\large Formal Verification, EPFL}
 \author{
@@ -21,7 +24,9 @@
 \maketitle
 
 \begin{abstract}
-	\lipsum[1]
+	\lipsum[1] \cite{blackshear2022borrow}
 \end{abstract}
+
+\printbibliography
 
 \end{document}

@@ -6,8 +6,11 @@
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage[margin=3cm]{geometry}
+\usepackage{biblatex}
+\usepackage{hyperref}
 
 \graphicspath{{./assets}}
+\addbibresource{references.bib}
 
 \title{The Move borrow checker -- review\\\large Formal Verification, EPFL}
 \author{
@@ -20,8 +23,8 @@
 
 \maketitle
 
-\begin{abstract}
-	\lipsum[1]
-\end{abstract}
+\cite{blackshear2022borrow}
+
+\printbibliography
 
 \end{document}
