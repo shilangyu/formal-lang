@@ -1,7 +1,6 @@
 \documentclass[notitlepage]{article}
 
 \usepackage{titling}
-\usepackage{lipsum}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
@@ -24,7 +23,7 @@
 \maketitle
 
 \begin{abstract}
-	\lipsum[1] \cite{blackshear2022borrow}
+	Many of the available mainstream programming languages were created without much of consideration of their formal foundation. This makes it difficult to reason about safety guarantees in retrospect. Only a subset of C programs can be formally proven to be memory safe. On the other hand, memory safety guarantees of \texttt{unsafe}-free Rust can be formally proven on the language-level\cite{10.1145/3158154}. In a similar vein we aim tackle the issue of memory safety within a language. We define a toy imperative programming language with semantics that allow us to formally show that any program written in this language will not violate memory safety properties. We derive and prove properties from the type checking stage and then show that the interpreter preserves said properties. The memory safety properties of interest are: no dangling references, no overlapping memory regions, and no access to unallocated/unowned memory. As a backing paper we use the formal definition of the static analysis of the Move language\cite{blackshear2022borrow} which concerns itself with similar memory issues.
 \end{abstract}
 
 \printbibliography
