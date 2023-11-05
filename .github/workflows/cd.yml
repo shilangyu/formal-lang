@@ -1,0 +1,33 @@
+name: cd
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency: cd-${{ github.ref }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile report
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: report
+          root_file: main.tex
+
+      - name: Create output directory
+        run: |
+          mkdir _build
+          mv report/main.pdf _build/report.pdf
+
+      - name: Deploy pdfs to Github Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: _build
