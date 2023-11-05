@@ -13,6 +13,7 @@
 .*.lb
 *latexmk
 *.synctex.gz
+*.dvi
 
 # bibtex
 *.bcf
