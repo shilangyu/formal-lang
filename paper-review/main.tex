@@ -5,14 +5,20 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
-\usepackage[margin=3cm]{geometry}
+\usepackage[margin=2.5cm]{geometry}
 \usepackage{biblatex}
 \usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\setlength{\droptitle}{-5em}
+\input{styles}
 
 \graphicspath{{./assets}}
 \addbibresource{references.bib}
 
-\title{The Move borrow checker -- review\\\large Formal Verification, EPFL}
+\title{The Move Borrow Checker -- Review\\\large Formal Verification, EPFL}
 \author{
 	Guillem Bartrina I Moreno \\ \normalsize guillem.bartrinaimoreno@epfl.ch \and
 	Franco Sainas \\ \normalsize franco.sainas@epfl.ch \and
@@ -23,8 +29,16 @@
 
 \maketitle
 
-\cite{blackshear2022borrow}
 
+\input{introduction}
+
+\input{language}
+
+\input{moveborrowchecker}
+
+\input{conclusions}
+
+\newpage
 \printbibliography
 
 \end{document}

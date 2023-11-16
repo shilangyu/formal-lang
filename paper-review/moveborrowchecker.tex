@@ -1,0 +1,127 @@
+\section{Move Borrow Checker}
+
+% Somewhere:
+
+% Imposes abstraction of DA Borrow G over all the values comprising the program memory
+% Defines intraprocedural static analysis to check that a move program adheres discipline enforced by to borrow graph -> Ensure 3 important memory properties: X, Y, Z.
+
+%All analysis, and specially Borrow analysis/checking are facilitated or build on top of the design/assumptrions of the language framework (top-level references, tree-shaped mem)
+
+% Since the analysis is modular (intraprocedural) for speed, we need to enforce some requirements [no ret glob ref, acquire, ...] and sacrifice some precision on our borrow graph [return ref] or our locations [T for global locs]. Global instructions carefully deisgned to be compatible with this.
+
+% ------------------------
+
+The Borrow Checker is a key piece of the Move Bytecode Verifier, which is executed on every piece of code that is to be executed on the \textit{blockchain}.  Any program that passes the check is guaranteed to enjoy the three desirable properties we have stated: absence of dangling references, referential transparency and absence of memory leaks.
+
+This check builds upon specific local annotations at each program point of each procedure. One can use these annotations to derive a (conservatively approximate) abstract state from a concrete one. Then, one may formulate the memory safety invariants as a predicate over a concrete state and abstract state. Finally, combining the operational semantics and the propagation of local annotations, one can show that any reachable concrete state in the program is connected to its corresponding abstract state by that invariant, effectively proving that the entire program enjoys all three properties.
+
+\vspace{0.1cm}
+
+\noindent\textbf{Definitions}
+
+An \textit{abstract location} represents either the contents of a local variable in some stack frame or the contents of the operand stack at some position. It can be looked up in a concrete state to return the corresponding location, reference or value.
+
+A \textit{borrow graph} is a directed graph whose nodes represent abstract locations and arcs, which are labelled with a path, represent borrowing relations. A borrow arc $x \stackrel{p}{\rightarrow} y$ indicates that \textit{$x[p]$ is borrowed by $y$}. We say that $x \stackrel{p}{\rightarrow} y$ is \textit{subsumed} by $x \stackrel{q}{\rightarrow} y$ if $q$ is a prefix of $p$. Let $G$ and $H$ be borrow graphs, we define $G \sqsubseteq H$ iff every arc in $G$ is subsumed by some arc in $H$. Semantically, this means that $G$ imposes every restriction on concrete execution that $H$ does, so every state that satisfies $G$ also satisfies $H$.
+
+\subsection{Local annotations}
+
+The local annotations required by the analysis at every program point are in fact local abstract states, which capture local typing and borrowing information relative to that program point.
+
+A \textit{local abstract state} is a tuple $\langle \hat{L},\hat{S},B \rangle$ where: $\hat{L}$ maps local variables to their types; $\hat{S}$ contains the types of the \textit{visible} elements in the operand stack; and $B$ is the borrow graph of all abstract locations in $\hat{L}$ and $\hat{S}$. These abstract locations are defined as if the call and operand stacks were empty (indices start at 0), they can be viewed as offsets. A local abstract state is \textit{well-formed} if $\hat{L}$ includes all input abstract locations, $B$ is acyclic and no borrow arc in $B$ is incident to an input abstract location.
+
+We write $\langle \hat{L},\hat{S},B \rangle \sqsubseteq \langle \hat{L}',\hat{S}',B' \rangle$ iff $\hat{L} = \hat{L}'$, $\hat{S} = \hat{S}'$ and $B \sqsubseteq B'$. Semantically, every concrete state represented by $\langle \hat{L},\hat{S},B \rangle$ can also be conservatively represented by $\langle \hat{L}',\hat{S}',B' \rangle$.
+
+\vspace{0.1cm}
+
+\noindent\textbf{Propagation of local abstract state}
+
+The abstract execution of a given bytecode instruction is a form of type \& borrow propagation. Therefore, by defining appropriate propagation rules for every bytecode instruction, one can establish the basis for calculating these local annotations at every program point.
+These propagation rules are of the form $\rho, \text{op} \vdash \langle \hat{L},\hat{S},B \rangle \rightarrow \langle \hat{L}',\hat{S}',B' \rangle$. They preserve 'well-formedness' by construction.
+
+\vspace{0.1cm}
+
+\noindent\textbf{Well-typed programs}
+
+The notion of a well-typed program is defined in terms of these local annotations. A program $\mathcal{P}$ is \textit{well-typed} if, for all its procedures $\rho$:
+\begin{itemize}
+    \itemsep 0em
+    \item Initially, the only local variables are the arguments and the operand stack and borrow graph are empty.
+    \item The 'restrictions' imposed after executing an instruction continue to every possible next instruction. In other words, let $\langle \hat{L},\hat{S},B \rangle$ be the local abstract state obtained by applying the propagation rule of the current instruction, we have that $\langle \hat{L},\hat{S},B \rangle \sqsubseteq \langle \hat{L}',\hat{S}',B' \rangle$ for every local abstract state $\langle \hat{L}',\hat{S}',B' \rangle$ in the possible next program points.
+\end{itemize}
+
+\noindent\textbf{Computing local annotations}
+
+One can define the following well-behaved join operation between two borrow graphs $G$ and $H$: take the union of arcs in $G$ and $H$ and then drop every borrow arc in the result that is subsumed by another.
+
+The computation of the local annotations at each program point is performed \textbf{locally for each procedure} based on abstract interpretation. Starting from certain initial local abstract states, the corresponding type \& borrow propagation rules are applied and their result is joint in an iterative fashion until a fixpoint is reached.
+
+It may happen that the borrow graph becomes cyclic after some join operation, in such case the procedure is aborted and a type error is reported. Otherwise, if it reaches fixpoint, we are guaranteed that the computed local annotations define a well-typed program.
+
+\subsection{Abstract state}
+
+An \textit{abstract state} is a tuple $\langle \hat{P},\hat{S},B \rangle$ where: abstract call stack $\hat{P}$ is a list of frames, each frame is a list of triples $(\rho, l, \hat{L})$ comprising a procedure $\rho$, a program counter $l$ and a map from variables to types $\hat{L}$. It defines a set of abstract locations of local variables in stack frames. Abstract operand stack $\hat{S}$ is a list of types. It defines a set of abstract locations in operand stack. And borrow graph $B$ includes all abstract locations defined by $\hat{P}$ and $\hat{S}$. An abstract state is similar to a concrete state but it carries typing information instead of locations, values or references and it includes a borrow graph instead of the memory.
+
+\vspace{0.1cm}
+
+\noindent\textbf{Abstraction function}
+
+One can define the abstraction function $Abs$ on well-typed programs, which maps concrete states \(\langle P,S,M \rangle\) to abstract states $\langle \hat{P},\hat{S},B \rangle$. It constructs the abstract state only by looking at the concrete state and all the local annotations at every program point. The function itself is fairly straightforward, just involves a bit of playing around with abstract location types, indexes and offsets, and some renaming and joining operations on borrow graphs. By the properties of a well-typed program, we are guaranteed that $B$ is acyclic.
+
+\subsection{Invariants}
+
+One wishes to prove memory safety invariants about the execution of any well-typed program. These invariant can be stated as a predicate $Inv(s, \hat{s})$ over a concrete state $s$ and an abstract state $\hat{s}$.
+
+$Inv$ is defined the conjunction of $InvA$, $InvB$, $InvC$, $InvD$.
+
+\noindent\textbf{Type agreement}
+
+$s$ and $\hat{s}$ are said to be \textit{shape-matching} is they have the same call stack height, the same operand stack height and there is agreement between the corresponding procedure names, program counters and the set of local variables in each stack frame. Moreover, they are said to be \textit{type-matching} if the values of $s$ represented by the abstract locations of $\hat{s}$ conform to the types.
+$InvA$ captures that $s$ and $\hat{s}$ are shape and type -matching.
+
+\noindent\textbf{No memory leaks}
+
+$InvB$ captures that there are no memory leaks, that is: every local variable on the call stack contains a different location and that the memory does not contain any location not present in a local variable.
+
+\noindent\textbf{No dangling references}
+
+Given shape-matching $s$ and $\hat{s}$, a borrow arc $m \stackrel{p}{\rightarrow} n$ is \textit{realized} in the concrete state $s$ if the path $p$ leads from the content of $m$ to the content of $n$. Concretely, this can happen if either $m$ contains a location and $n$ a reference or both contain references.
+
+$InvC$ captures the fact that there are no dangling references, that is, every reference is rooted in a memory location present in some local variable on the call stack: the borrow graph is acyclic, for all value-typed abstract locations in $\hat{s}$ there is no incident arc in the borrow graph, for all  \textbf{reference}-typed abstract locations in $\hat{s}$ there is an incident arc in the borrow graph that is realized in the concrete state $s$.
+
+\noindent\textbf{Referential transparency}
+
+$InvD$ captures the fact that if there is no borrow arcs out of an abstract location of type value or mutable reference, is is guaranteed that any mutation via that abstract location (either the stored value or the value pointed) does not invalidate any other reference. Concretely, for any distinct abstract locations $m$ and $n$ such that $n$ is of type reference and that the concrete contents of $m$ and $n$ are, respectively (a) a location and a reference rooted on that location or (b) a reference and another reference to a prefix of the first one, we have one of the following: both $m$ and $n$ are of type immutable reference; $m$ is not of type immutable reference and there is a path in the borrow graph from $m$ to $n$ comprising arcs realized in $s$; or the contents of $m$ and $n$ are the same and there is a path in the borrow graph from $n$ to $m$ comprising arcs realized in $s$.
+
+\subsection{Main theorem}
+
+Finally, one puts to use the abstraction function together with the operational semantics and the propagation of local annotations to prove the main theorem:
+
+\newtheorem{theorem}{Theorem}
+
+\begin{theorem}
+    Let $\mathcal{P}$ be a well-typed program,\\
+    If $s$ is a concrete state with $Inv(s, Abs(s))$ and $\mathcal{P} \vdash s \rightarrow s'$, then $Inv(s', Abs(s'))$
+\end{theorem}
+Which informally states that in a well-typed program, if a concrete state is connected to its corresponding abstract state by the invariants, then any other concrete state reachable from it is also connected to its corresponding abstract state by the same invariants. Authors present the proof in supplementary materials. Since the proof is not the main contribution of this paper and is quite long and involved, we omit even sketching it in our review.
+
+\subsection{Putting all together}
+
+Given that the program is well-typed, one can easily show that for the initial state $s_0$, which only has one stack frame with the inputs to the transaction and has empty operand stack and memory, it holds that $Inv(s_0, Abs(s_0))$.
+
+% Then, by application of the theorem, we get that the invariants hold for all reachable states, that is, the whole execution of the program.
+
+Hence, the whole analysis of the Borrow Checker reduces to compute the appropriate local annotations using the fixpoint algorithm mentioned in a section. In case it succeeds, we know that the resulting local annotations define a well-typed program, so by application of the previous theorem on the fact the invariants hold for the initial state $s_0$, we get that \textbf{the invariants will hold for the entire program execution}.
+
+\textit{Remark: this analysis builds upon some assumptions on the correct structure of the program that must be checked prior to its execution. These are: \textbf{Stack usage analysis}, which ensures that the shape-matching property holds; \textbf{Value type analysis}, which checks that values are used if they have not been moved and that instructions are applied to values of appropriate types; and \textbf{Acquires analysis}, which checks acquire annotations on procedures (related to global memory).}
+
+% Comment on global mem?
+
+% ----
+
+% To this end, it annotates every instruction (program point) with an abstract state. These annotations are computed via a fixpoint of an abstract interpretation of the program. The abstract domain consists of (local) abstract states, which form a lattice: they define a partial order and the join/union/lub operation is defined as follows:
+% given two borrw graphs: take union of edfes and then drop subsumed edges
+% (the result may be cyclic, in that case an error is reported)
+% If the algorith suceeds, by definition we have a well-typed program and therefore the theorem says that the program is memory safe
+% (specifically, all reachable states satisfy the invariant)
+
+% ----

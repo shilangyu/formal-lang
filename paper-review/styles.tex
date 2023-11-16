@@ -1,0 +1,52 @@
+\lstdefinelanguage{Rust}{
+  sensitive=true,
+  morekeywords=[1]{
+      abstract, as, become, box, break, const, continue, crate, do, else, enum,
+      extern, false, final, fn, for, if, impl, in, let, loop, macro, match, mod,
+      move, mut, override, priv, pub, ref, return, self, Self, static, struct,
+      super, trait, true, type, unsafe, use, virtual, where, while, yield
+    },
+  morekeywords=[2]{
+      i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, f32, f64, isize, usize,
+      Option, Some, None, Ok, Err, Result
+    },
+  morekeywords=[3]{
+      Vec, String, println, format, assert_eq, assert_ne, assert
+    },
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]{"},
+  morestring=[b]{'},
+  alsoletter={-},
+  alsodigit={},
+  emph={
+      Box, Option, Result,
+      Some, None, Ok, Err,
+      String, Vec,
+    },
+  emphstyle={[1]\color{blue}},
+  emphstyle={[2]\color{purple}},
+  emphstyle={[3]\color{teal}},
+}
+
+\lstset{
+  language=Rust,
+  basicstyle=\small\ttfamily,
+  keywordstyle=\bfseries,
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{orange},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=5pt,
+  backgroundcolor=\color{gray!5},
+  frame=single,
+  rulecolor=\color{black!30},
+  breaklines=true,
+  breakatwhitespace=true,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=4,
+  captionpos=b,
+}

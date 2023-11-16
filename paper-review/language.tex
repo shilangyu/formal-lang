@@ -1,0 +1,44 @@
+\section{The Move language}
+
+In the Move language variables can either be owners of some value or be borrowing a value owned by a different variable. At any point in time there exists at most a single owner of a value. This separation of owned and borrowed values is visible in the type system: owned values are annotated with the type \lstinline{T} while borrowed values with \lstinline{&T} and \lstinline{&mut T} for immutable and mutable references respectively. The state of borrows is tracked to eliminate previously introduced memory issues. Ownership can be transferred with the \lstinline{move} keyword, but only under the condition that the value has no outstanding borrows, otherwise these references would be invalidated. At any point in the program all references have to point to a value that has an owner. And finally when a value is mutably borrowed, the value can be accessed only through that reference. Together these simple rules prevent problems with dangling references.
+
+Since Move supports composite types, tracking ownership has to be more fine grained to allow borrows of fields. To do that Move maintains a notion of paths which is a sequence of field selections of some type. \lstinline{v[p]} denotes the field selections of a value \lstinline{v} by a path \lstinline{p}. Values in Move are tree-shaped, so a specific field is represented by a unique path. This allows Move to identify borrows to the same value by simply comparing the paths of a borrow.
+
+\subsection{Global memory}
+
+Global storage, a distinctive characteristic of blockchain technology, is shared among all smart contracts and persists across all executions. Access to it is provided through association of an account addresses and a type with record values: $(\text{Addr}\times\text{Type}) \to \text{Record}$. Accessing global memory is designed in a way to fit into the existing reference semantics. Interacting with the global memory consists of three operations:
+
+\begin{itemize}
+    \item \lstinline{move_to<T>(a: address, value: T)} -- sets a value at a given address
+    \item \lstinline{move_from<T>(a: address): T} -- removes and gives ownership of the value under some address
+    \item \lstinline{borrow_global<T>(a: address): &mut T} -- borrows mutably the value under some address
+\end{itemize}
+
+To fit these operations into the existing reference semantics it is enough to see borrows as coming from \lstinline{T} instead of an owner. One issue is that global accesses are invisible across procedure boundaries. Move strives to infer all borrow relations of a procedure strictly from its signature to keep reasoning local. Therefore a special syntax has to be introduced to denote a procedure potentially taking ownership of a global resource. This is shown below with the \lstinline{acquires} clause.
+
+
+\begin{lstlisting}[escapechar=!, language=Rust]
+fun remove_t(a: address): T acquires T {
+    return move_from<T>(a);
+}
+\end{lstlisting}
+
+Move code is organized in modules. This allows to create logically safe abstractions. In practice this is enforced by limiting access to global memory indexed by some type T to the module that defined this type. Additionally the creation and destruction of record values can only happen within the module that defines the type of that value. An interesting consequence of that is if a module were to define a record \lstinline{Coin} which represents a financial asset that module would be guaranteed that if it gives someone the ownership of a \lstinline{Coin} instance through an inter-module boundary procedure call, that coin could not be destroyed (disappearance of funds) nor duplicated (duplication of funds) outside of the defining module.
+
+% ^ a bit of a mouthful
+
+\subsection{Memory Model}
+
+Move compiler produces bytecode for a stack-based VM. All formalization is built on top of the bytecode representation. In result Move encompasses three distinct types of storage:
+
+\begin{itemize}
+    \item Call Stack -- This segment holds procedure frames containing a fixed set of local variables. These variables remain uninitialized at the beginning of the procedure. Initialized procedures, however, can store both values and references.
+    \item Operand Stack -- Primarily utilized for local computations and the exchange of arguments/return values among procedures, the operand stack is shared across procedures. At the initiation of program execution, the call stack holds one frame, and the operand stack is free of elements. If the program concludes successfully, the initial and final states of the operand stack coincide.
+    \item Global Storage
+\end{itemize}
+
+The exact operational semantics of the language are skipped in this review. However a crucial piece to formalization is the notion of a concrete state.
+
+\noindent\textbf{Definition}
+
+A \textit{concrete state} \lstinline{s} represents the state of the program at a specific point. It is denoted by a tuple \(\langle P, S, M \rangle\) where: \(P\) is the call stack, a list of frames. Each frame is a triple $(\rho, \ell, L)$ which represents a procedure \(\rho\), the program counter $\ell$, and a store of local variables \(L\) that maps variables to locations or references. \(S\) is the operand stack holding a list of values and references. Finally, \(M\) is the memory which maps locations to values.

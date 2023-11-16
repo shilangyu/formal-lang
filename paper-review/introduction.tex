@@ -1,0 +1,37 @@
+\section{Introduction}
+A smart contract is a self-executing contract where the terms of the agreement are directly written into code. It runs on a blockchain, automating and enforcing the terms of the contract without the need for intermediaries. The immutability of these contracts, once deployed, and the substantial real-world value of the digital assets they manage underscore the critical importance of security measures \cite{cnbc2023}. In adversarial settings where malicious entities seek to exploit vulnerabilities, robust security measures are paramount to prevent unauthorized access, manipulation, or theft of these valuable assets\cite{Atzei2017ASO}. Given the necessity for all network nodes to reach a consensus on execution outcomes, determinism also becomes a foundational attribute.
+
+%The Move programming language \cite{Blackshear2019MoveAL} is a Rust-inspired language designed for smart contracts. Leveraging a memory model akin to Rust, Move employs ownership and borrowing mechanisms to ensure memory safety.
+
+The Move programming language \cite{Blackshear2019MoveAL} is designed specifically for smart contracts. Unlike Solidity, the prevailing language for smart contracts, Move adopts a combination of move and reference semantics. In alignment with the Rust programming language, Move utilizes ownership and borrowing as a key mechanisms to effectively address its security challenges.
+
+% [Guillem] POSSIBLE EXPANSION: The Move programming language \cite{Blackshear2019MoveAL} is designed specifically for smart contracts that deal with digital assets and it is based on a combination of move and reference semantics, that puts it in a sweet spot between safety and flexibility.
+
+Our focus centers on the Move Borrow Checker\cite{blackshear2022borrow}, a tool that guarantees three pivotal memory properties in valid Move programs: the elimination of dangling references, referential transparency for immutable references, and the prevention of memory leaks. This review delves into the efficacy of the Move Borrow Checker in upholding these critical memory-related assurances.
+
+\subsection{Memory Challenges}
+
+The paper presents a few examples illustrating potential memory safety issues that may arise in Move in the absence of adequate checks by the borrow checker. We highlight the most noteworthy instances in this report.
+
+A dangling reference is reference in a program that points to memory that has been deallocated or is no longer valid.
+The function defined here accepts a parameter \texttt{c} of type \texttt{Coin} and assigns a reference to the field \texttt{f} of \texttt{c} to a variable \texttt{r}. Subsequently, the coin \texttt{c} is moved to another variable, leading to a change in its memory location. Consequently, the memory referenced by \texttt{r} is rendered invalid.
+
+\begin{lstlisting}[escapechar=!, language=Rust]
+fun dangle_after_move(c: Coin) {
+    let r = &c.f; // the field f of c is borrowed by r
+    let x = move c; // !\dag!
+    let y = *r; // read from dangling ref
+}
+\end{lstlisting}
+
+
+Here $\dag$ indicates where the bug is introduced, causing the code to fail validation by the borrow checker.
+
+The paper presents instances of dangling references across procedures as well. These two functions illustrate the potential to write Move code that returns unsafe references to local variables, which subsequently become dangling after the procedure terminates.
+
+\begin{lstlisting}[escapechar=!, language=Rust]
+fun ret_local(): &u64 { let x = 7; &x } !\dag!
+fun ret_param(x: u64): &u64 { &x } !\dag!
+\end{lstlisting}
+
+Such bugs have the potential to render a smart contract unusable. If not identified prior to deployment, they may result in the contract entering a sink state, effectively trapping funds within it permanently.
