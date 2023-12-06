@@ -18,3 +18,17 @@ jobs:
         with:
           working_directory: report
           root_file: main.tex
+      
+      - name: Cache scala tools
+        uses: coursier/cache-action@v6
+      
+      - name: Install scala tools
+        uses: coursier/setup-action@v1
+        with:
+          apps: sbtn scalafmt
+      
+      - name: Check project formatting
+        working-directory: lang/
+        run: scalafmt --test
+          
+      

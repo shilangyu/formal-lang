@@ -1,4 +1,3 @@
 package lang
 
-
-@main def main() = {()}.ensuring(true)
+@main def main() = { () }.ensuring(true)
