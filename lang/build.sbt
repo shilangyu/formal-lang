@@ -7,3 +7,7 @@ lazy val root = project
     name := "lang",
     stainlessEnabled := false
   )
+
+libraryDependencies ++= Seq(
+  "org.scalatest" %% "scalatest" % "3.2.17" % Test
+)
