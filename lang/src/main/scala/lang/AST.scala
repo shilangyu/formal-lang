@@ -1,31 +1,31 @@
 package lang
 
-sealed abstract class Expr;
+enum Expr {
+  case True
+  case False
+  case Nand(val left: Expr, val right: Expr)
 
-final case class ExprTrue() extends Expr;
-final case class ExprFalse() extends Expr;
-final case class ExprNand(val left: Expr, val right: Expr) extends Expr;
+  case Ident(val name: String)
 
-final case class ExprIdent(val name: String) extends Expr;
+  case Ref(val of: Expr)
+  case Deref(val of: Expr)
 
-final case class ExprRef(val of: Expr) extends Expr;
-final case class ExprDeref(val of: Expr) extends Expr;
+  // TODO: introduce structs
+  // case Struct(val fields: List[StructField])
+  // case StructField(val name: String, val value: Expr)
+  // case Field(val of: Expr, val name: String)
+}
 
-final case class ExprStruct(val fields: List[ExprStructField]) extends Expr;
-final case class ExprStructField(val name: String, val value: Expr)
-    extends Expr;
-final case class ExprField(val name: String, val of: Expr) extends Expr;
+enum Stmt {
+  case Decl(val name: String, val value: Expr)
+  case Assign(val to: Expr, val value: Expr)
 
-sealed abstract class Stmt;
+  case If(val condition: Expr, val body: Stmt)
+  case While(val condition: Expr, val body: Stmt)
 
-final case class StmtDecl(val name: String, val value: Expr) extends Stmt;
-final case class StmtAssign(val to: Expr, val value: Expr) extends Stmt;
+  case Block(val statments: List[Stmt])
 
-final case class StmtIf(val condition: Expr, val body: Stmt) extends Stmt;
-final case class StmtWhile(val condition: Expr, val body: Stmt) extends Stmt;
+  case Swap(val left: Expr, val right: Expr)
 
-final case class StmtBlock(val statments: List[Stmt]) extends Stmt;
-
-final case class StmtSwap(val left: Expr, val right: Expr) extends Stmt;
-
-final case class StmtBye(val ref: Expr) extends Stmt;
+  case Bye(val ref: Expr.Ident)
+}
