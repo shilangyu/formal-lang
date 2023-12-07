@@ -13,11 +13,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile report
-        uses: xu-cheng/latex-action@v3
-        with:
-          working_directory: report
-          root_file: main.tex
+      # TODO: disabled for now as to not waste CI time
+      # - name: Compile report
+      #   uses: xu-cheng/latex-action@v3
+      #   with:
+      #     working_directory: report
+      #     root_file: main.tex
+
+      # - name: Compile paper review
+      #   uses: xu-cheng/latex-action@v3
+      #   with:
+      #     working_directory: paper-review
+      #     root_file: main.tex
       
       - name: Install Lean
         run: |
