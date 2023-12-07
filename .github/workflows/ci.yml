@@ -13,11 +13,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile report
-        uses: xu-cheng/latex-action@v3
-        with:
-          working_directory: report
-          root_file: main.tex
+      # TODO: disabled for now as to not waste CI time
+      # - name: Compile report
+      #   uses: xu-cheng/latex-action@v3
+      #   with:
+      #     working_directory: report
+      #     root_file: main.tex
+
+      # - name: Compile paper review
+      #   uses: xu-cheng/latex-action@v3
+      #   with:
+      #     working_directory: paper-review
+      #     root_file: main.tex
+      
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "${HOME}/.elan/bin" >> $GITHUB_PATH
       
       - name: Cache scala tools
         uses: coursier/cache-action@v6
@@ -34,5 +46,9 @@ jobs:
       - name: Run tests
         working-directory: lang/
         run: sbt test
+
+      - name: Build Lean project
+        working-directory: lean/
+        run: lake build
           
       
