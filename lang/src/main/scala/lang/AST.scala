@@ -19,7 +19,7 @@ enum Expr {
 }
 
 enum Stmt {
-  case Decl(val name: String, val value: Expr)
+  case Decl(val name: Name, val value: Expr)
   case Assign(val to: Name, val value: Expr)
 
   case If(val condition: Expr, val body: Stmt)
