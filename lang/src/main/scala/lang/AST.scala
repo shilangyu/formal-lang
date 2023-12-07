@@ -31,7 +31,7 @@ enum Stmt {
   // !x := True
   case DerefAssign(val to: Ident, val value: Expr)  
 
-  case If(val condition: Expr, val body: Stmt)
+  case If(val condition: Expr, val then: Stmt, val else: Stmt)
   case While(val condition: Expr, val body: Stmt)
 
   case Block(val statments: List[Stmt])
