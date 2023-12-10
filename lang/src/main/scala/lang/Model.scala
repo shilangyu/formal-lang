@@ -5,7 +5,7 @@ import stainless.lang.*
 import stainless.collection.*
 
 
-type Loc = Int
+type Loc = BigInt
 
 //type ExprVal = Boolean
 type Env = Map[Name, Loc]
@@ -20,4 +20,5 @@ type State = (Env, Mem, Loc)
 
 enum LangException:
   case UndeclaredVariable
+  case RedeclaredVariable
   case InvalidLoc
