@@ -1,6 +1,6 @@
 package lang
 
-opaque type Name = String
+type Name = String
 
 enum Expr {
   case True
@@ -9,8 +9,8 @@ enum Expr {
 
   case Ident(val name: Name)
 
-  case Ref(val of: Expr)
-  case Deref(val of: Expr)
+  //case Ref(val of: Expr)
+  //case Deref(val of: Expr)
 
   // TODO: introduce structs
   // case Struct(val fields: List[StructField])
@@ -21,13 +21,10 @@ enum Expr {
 enum Stmt {
   case Decl(val name: Name, val value: Expr)
   case Assign(val to: Name, val value: Expr)
-
   case If(val condition: Expr, val body: Stmt)
   case While(val condition: Expr, val body: Stmt)
-
-  case Block(val statments: List[Stmt])
-
-  case Swap(val left: Expr, val right: Expr)
-
-  case Bye(val ref: Name)
+  case Seq(val s1: Stmt, val s2: Stmt)
+  //case Block(val stmt: Stmt)
+  //case Swap(val left: Expr, val right: Expr)
+  //case Bye(val ref: Name)
 }
