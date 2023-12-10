@@ -1,43 +1,41 @@
 package lang
 
-import stainless.lang._
-import stainless.collection._
-import stainless.annotation._
+import stainless.*
+import stainless.lang.*
+import stainless.collection.*
 
-import lang.{Name, Expr, Stmt}
-import lang.{ExprVal, Env}
-import lang.{Interpreter}
+import Expr.*
+import Stmt.*
 
 object Checker {
 
   // Check if there are access to undeclared variables
   def isExprClosed(expr: Expr, env: Env): Boolean = expr match {
-    case Expr.True       => true
-    case Expr.False      => true
-    case Expr.Nand(l, r) => isExprClosed(l, env) && isExprClosed(r, env)
-    case Expr.Ident(n)   => env.contains(n)
-    //case Expr.Ref(e)     => isExprClosed(e, env)
-    //case Expr.Deref(e)   => isExprClosed(e, env)
-  } ensuring(_ => Interpreter.evalExpr(expr))
+    case True       => true
+    case False      => true
+    case Nand(left, right) => isExprClosed(left, env) && isExprClosed(right, env)
+    case Ident(name)   => env.contains(name)
+    //case Ref(e)     => isExprClosed(e, env)
+    //case Deref(e)   => isExprClosed(e, env)
+  }
 
   // Check if there are access to undeclared variables
-  def isClosed(prog: Stmt, envs: List[Env]): (Boolean, List[Env])= prog match {
-    case Stmt.Decl(n, v)          => (true, envs.head.updated(n, 1)::envs.tail)
-    case Stmt.Assign(n, v)        => (envs.head.contains(n), envs)
-    case Stmt.If(cond, body)      => 
-      val (b, envs1) = isClosed(body, envs) 
-      (isExprClosed(cond, envs1.head) && b, envs1)
-    case Stmt.While(cond, body)   => 
-      val (b, envs1) = isClosed(body, envs)
-      (isExprClosed(cond, envs1.head) && b, envs1)
-    case Stmt.Seq(s1, s2)         => 
-      val (b, envs1) = isClosed(s1, envs)
-      if b then 
-        val (b, envs2) = isClosed(s2, envs1) 
-        (b, envs2)
-      else (false, envs1)
-    //case Stmt.Block(s)            => isClosed(s,envs.head::envs) 
-    //case Stmt.Swap(e1, e2)        => isExprClosed(e1, envs.head) && isExprClosed(e2, envs.head)
-    //case Stmt.Bye(n)              => envs.head.contains(n)
+  def isStmtClosed(stmt: Stmt, env: Env): Boolean = stmt match {
+    case Decl(name, value)   => isExprClosed(value, env)
+    case Assign(to, value)   => env.contains(to) && isExprClosed(value, env)
+    case If(cond, body)      => isExprClosed(cond, env) && isStmtClosed(body, env)
+    case While(cond, body)   => isExprClosed(cond, env) && isStmtClosed(body, env)
+    case Seq(s1, s2)         =>
+      isStmtClosed(s1, env) && (
+        s1 match
+          case Decl(name, _) => isStmtClosed(s2, env.updated(name, 0))
+          case _ => isStmtClosed(s2, env)
+      )
+    //case Block(s)            => isClosed(s,envs.head::envs) 
+    //case Swap(e1, e2)        => isExprClosed(e1, envs.head) && isExprClosed(e2, envs.head)
+    //case Bye(n)              => envs.head.contains(n)
   }
+
+  def isProgClosed(prog: Stmt): Boolean =
+    isStmtClosed(prog, Map.empty[Name, Loc])
 }
