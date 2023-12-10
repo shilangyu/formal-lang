@@ -27,7 +27,7 @@ enum Stmt {
   case Decl(val name: Name, val value: Expr)
   case Assign(val to: Name, val value: Expr)
   case If(val cond: Expr, val body: Stmt)
-  case While(val cond: Expr, val body: Stmt)
+  //case While(val cond: Expr, val body: Stmt)
   case Seq(val s1: Stmt, val s2: Stmt)
   //case Block(val stmt: Stmt)
   //case Swap(val left: Expr, val right: Expr)

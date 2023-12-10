@@ -20,22 +20,24 @@ object Checker {
   }
 
   // Check if there are access to undeclared variables
-  def isStmtClosed(stmt: Stmt, env: Env): Boolean = stmt match {
-    case Decl(name, value)   => isExprClosed(value, env)
-    case Assign(to, value)   => env.contains(to) && isExprClosed(value, env)
-    case If(cond, body)      => isExprClosed(cond, env) && isStmtClosed(body, env)
-    case While(cond, body)   => isExprClosed(cond, env) && isStmtClosed(body, env)
+  def isStmtClosed(stmt: Stmt, env: Env): (Boolean, Env) = stmt match {
+    case Decl(name, value)   => (isExprClosed(value, env), env.updated(name, 0))
+    case Assign(to, value)   => (env.contains(to) && isExprClosed(value, env), env)
+    case If(cond, body)      =>
+      val (b, nenv) = isStmtClosed(body, env)
+      (isExprClosed(cond, env) && b, env)
+    //case While(cond, body)   =>
+    //  val (b, nenv) = isStmtClosed(body, env)
+    //  (isExprClosed(cond, env) && b, nenv)
     case Seq(s1, s2)         =>
-      isStmtClosed(s1, env) && (
-        s1 match
-          case Decl(name, _) => isStmtClosed(s2, env.updated(name, 0))
-          case _ => isStmtClosed(s2, env)
-      )
+      val (b, nenv) = isStmtClosed(s1, env)
+      val (b2, nenv2) = isStmtClosed(s2, nenv)
+      (b && b2, nenv2)
     //case Block(s)            => isClosed(s,envs.head::envs) 
     //case Swap(e1, e2)        => isExprClosed(e1, envs.head) && isExprClosed(e2, envs.head)
     //case Bye(n)              => envs.head.contains(n)
   }
 
-  def isProgClosed(prog: Stmt): Boolean =
+  def isProgClosed(prog: Stmt): (Boolean, Env) =
     isStmtClosed(prog, Map.empty[Name, Loc])
 }
