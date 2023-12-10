@@ -1,11 +1,11 @@
 package lang
 
-import lang.{Checker, Env}
-import lang.Expr.*
-import lang.Stmt.*
-import lang.Name
+import Expr.*
+import Stmt.*
+
 
 @main def main() = { 
+  /*
   val env: Env = Map()
   val envs: List[Env] = List(env)
 
@@ -24,4 +24,5 @@ import lang.Name
 
   val r2: Boolean = Interpreter.evalExpr(p2, state2)
   println(s"Result: $r2")     // false
+  */
 }.ensuring(true)
