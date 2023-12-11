@@ -15,10 +15,17 @@ type Mem = Map[Loc, Boolean]
 // Loc is the first free location
 type State = (Env, Mem, Loc)
 
-//type Conf = State | (Stmt, State)
+type Cmd = (Stmt, State)
+
+//type Conf = State | Cmd
+
+enum Conf:
+  case St(st: State)
+  case Cmd(stmt: Stmt, st: State)
 
 
 enum LangException:
   case UndeclaredVariable
   case RedeclaredVariable
   case InvalidLoc
+  case SeqinSeq
