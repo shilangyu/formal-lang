@@ -2,6 +2,7 @@ package lang
 
 import stainless.*
 import stainless.lang.*
+import stainless.annotation.*
 import stainless.collection.*
 
 import Expr.*
@@ -28,7 +29,8 @@ object Interpreter {
     //case Expr.Ref(e)     => isExprClosed(e, env)
     //case Expr.Deref(e)   => isExprClosed(e, env)
 
-  def evalStmt(stmt: Stmt, state: State): Either[Set[LangException], State] = stmt match
+  def evalStmt(stmt: Stmt, state: State): Either[Set[LangException], State] =
+    stmt match
     case Decl(name, value) =>
       (state._1.contains(name), evalExpr(value, state)) match
         case (false, Right(v)) =>
@@ -71,6 +73,5 @@ object Interpreter {
         case Right(mstate) => evalStmt(s2, mstate) match
           case Left(excep) => Left(excep) 
           case Right(fstate) => Right(fstate)
-        
 
 }
