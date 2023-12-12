@@ -74,34 +74,36 @@ object Interpreter {
         case Right(s) => evalStmt(s2, s)
 
 
-  def traceStmt1(conf: Conf): Either[Set[LangException], Conf] = conf match
-    case St(state)  => Right(St(state))
-    case Cmd(stmt, state) => stmt match
-      case Decl(name, value)    => (state._1.get(name), evalExpr(value, state)) match
-        case (None(), Right(v))   =>
-          val loc = state._3
-          Right(St(state._1.updated(name, loc), state._2.updated(loc, v), loc + 1))
-        case (None(), Left(b))    => Left(b)
-        case (Some(_), Right(v))  => Left(Set(LangException.RedeclaredVariable)) 
-        case (Some(_), Left(b))   => Left(b + LangException.RedeclaredVariable)
-      case Assign(to, value)    => (state._1.get(to), evalExpr(value, state)) match
-        case (Some(loc), Right(v))  => state._2.get(loc) match
-          case Some(_) => Right(St(state._1, state._2.updated(loc, v), state._3))
-          case None()  => Left(Set(LangException.InvalidLoc))
-        case (Some(loc), Left(b))   => state._2.get(loc) match
-          case Some(_) => Left(b)
-          case None()  => Left(b + LangException.InvalidLoc)
-        case (None(), Right(_))     => Left(Set(LangException.UndeclaredVariable)) 
-        case (None(), Left(b))      => Left(b + LangException.UndeclaredVariable)
-      case If(cond, body)       => evalExpr(cond, state) match
-        case Left(b)  => Left(b) 
-        case Right(c) =>
-          if c then Right(Cmd(body, state))
-          else Right(St(state))
-      case Seq(s1, s2)          => traceStmt1(Cmd(s1, state)) match
-        case Left(b)  => Left(b)
-        case Right(c) => c match
-          case St(newState)         => Right(Cmd(s2, newState))
-          case Cmd(newS1, newState) => Right(Cmd(Seq(newS1, s2), newState)) 
+  def traceStmt1(conf: Conf): Either[Set[LangException], Conf] =
+    decreases(conf)
+    conf match
+      case St(state)  => Right(St(state))
+      case Cmd(stmt, state) => stmt match
+        case Decl(name, value)    => (state._1.get(name), evalExpr(value, state)) match
+          case (None(), Right(v))   =>
+            val loc = state._3
+            Right(St(state._1.updated(name, loc), state._2.updated(loc, v), loc + 1))
+          case (None(), Left(b))    => Left(b)
+          case (Some(_), Right(v))  => Left(Set(LangException.RedeclaredVariable)) 
+          case (Some(_), Left(b))   => Left(b + LangException.RedeclaredVariable)
+        case Assign(to, value)    => (state._1.get(to), evalExpr(value, state)) match
+          case (Some(loc), Right(v))  => state._2.get(loc) match
+            case Some(_) => Right(St(state._1, state._2.updated(loc, v), state._3))
+            case None()  => Left(Set(LangException.InvalidLoc))
+          case (Some(loc), Left(b))   => state._2.get(loc) match
+            case Some(_) => Left(b)
+            case None()  => Left(b + LangException.InvalidLoc)
+          case (None(), Right(_))     => Left(Set(LangException.UndeclaredVariable)) 
+          case (None(), Left(b))      => Left(b + LangException.UndeclaredVariable)
+        case If(cond, body)       => evalExpr(cond, state) match
+          case Left(b)  => Left(b) 
+          case Right(c) =>
+            if c then Right(Cmd(body, state))
+            else Right(St(state))
+        case Seq(s1, s2)          => traceStmt1(Cmd(s1, state)) match
+          case Left(b)  => Left(b)
+          case Right(c) => c match
+            case St(newState)         => Right(Cmd(s2, newState))
+            case Cmd(newS1, newState) => Right(Cmd(Seq(newS1, s2), newState)) 
 
 }
