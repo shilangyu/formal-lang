@@ -25,53 +25,52 @@ object Interpreter {
           state._2.get(loc) match
             case Some(value) => Right(value)
             case None()      => Left(Set(LangException.InvalidLoc))
-        case None()      => Left(Set(LangException.UndeclaredVariable))
-    //case Expr.Ref(e)     => isExprClosed(e, env)
-    //case Expr.Deref(e)   => isExprClosed(e, env)
+        case None()    => Left(Set(LangException.UndeclaredVariable))
+    //case Expr.Ref(e)       => isExprClosed(e, env)
+    //case Expr.Deref(e)     => isExprClosed(e, env)
 
   def evalStmt(stmt: Stmt, state: State): Either[Set[LangException], State] =
     stmt match
-    case Decl(name, value) =>
+    case Decl(name, value)  =>
       (state._1.contains(name), evalExpr(value, state)) match
-        case (false, Right(v)) =>
+        case (false, Right(v))  =>
           val loc = state._3
           Right((state._1 + (name -> loc), state._2.updated(loc, v), loc + 1))
-        case (false, Left(b)) => Left(b)
-        case (true, Left(b)) => Left(b + LangException.RedeclaredVariable)
-        case (true, _) => Left(Set(LangException.RedeclaredVariable)) 
-    case Assign(to, value) =>
+        case (false, Left(b))   => Left(b)
+        case (true, Left(b))    => Left(b + LangException.RedeclaredVariable)
+        case (true, _)          => Left(Set(LangException.RedeclaredVariable)) 
+    case Assign(to, value)  =>
       (state._1.get(to), evalExpr(value, state)) match
-        case (Some(loc), Right(v)) =>
+        case (Some(loc), Right(v))  =>
           if state._2.contains(loc) then Right((state._1, state._2.updated(loc, v), state._3))
           else Left(Set(LangException.InvalidLoc))
-        case (Some(loc), Left(b)) =>
+        case (Some(loc), Left(b))   =>
           if state._2.contains(loc) then Left(b)
           else Left(b + LangException.InvalidLoc)
-        case (None(), Left(b)) => Left(b + LangException.UndeclaredVariable)
-        case (None(), _) => Left(Set(LangException.UndeclaredVariable)) 
-    case If(cond, body) =>
+        case (None(), Left(b))      => Left(b + LangException.UndeclaredVariable)
+        case (None(), _)            => Left(Set(LangException.UndeclaredVariable)) 
+    case If(cond, body)     =>
       evalExpr(cond, state) match
-        case Left(excep) => Left(excep)
+        case Left(excep)  => Left(excep)
         case Right(value) =>
           if value then
             evalStmt(body, state) match
               case Left(excep) => Left(excep) 
-              case _ => Right(state)
+              case _           => Right(state)
           else Right(state)
     //case w @ While(cond, body) =>
     //  evalExpr(cond, state) match
-    //    case Left(b) => Left(b) 
+    //    case Left(b)  => Left(b) 
     //    case Right(c) =>
     //      if c then
     //        evalStmt(body, state) match
-    //          case Left(b) => Left(b) 
+    //          case Left(b)  => Left(b) 
     //          case Right(s) => Right(s) // evalStmt(w, s)
     //      else Right(state)
-    case Seq(s1, s2) =>          
+    case Seq(s1, s2)        =>          
       evalStmt(s1, state) match
-        case Left(excep) => Left(excep) 
+        case Left(excep)   => Left(excep) 
         case Right(mstate) => evalStmt(s2, mstate) match
-          case Left(excep) => Left(excep) 
+          case Left(excep)   => Left(excep) 
           case Right(fstate) => Right(fstate)
-
 }

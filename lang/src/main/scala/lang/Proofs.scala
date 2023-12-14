@@ -20,21 +20,19 @@ object Proofs {
   }
 
   @extern @pure
-  def keySetPost(env: Env, name: Name): Unit = {
-    ()
-  }.ensuring( _ =>
-    env.contains(name) == keySet(env).contains(name)
-  )
-
-  @extern @pure
   def emptyKeySetPost(): Unit = {
-    ()
   }.ensuring( _ =>
     Set.empty[Name] == keySet(Map.empty[Name, Loc])
   )
 
   @extern @pure
-  def sameKeyAdd(names: Set[Name], env: Env, key: Name, loc: Loc): Unit = {
+  def keySetPost(env: Env, name: Name): Unit = {
+  }.ensuring( _ =>
+    env.contains(name) == keySet(env).contains(name)
+  )
+
+  @extern @pure
+  def consistencySetkeySet(names: Set[Name], env: Env, key: Name, loc: Loc): Unit = {
     require(names == keySet(env))
   }.ensuring( _ =>
     names + key == keySet(env + (key -> loc))
@@ -62,7 +60,7 @@ object Proofs {
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
 
-  def checkerInterpreterSameKeys(stmt: Stmt, state: State): Unit = {
+  def consistencyKeysCheckerInterpreter(stmt: Stmt, state: State): Unit = {
     decreases(stmt)
     val keys = keySet(state._1)
     require(Checker.isStmtClosed(stmt, keys)._1)
@@ -71,13 +69,13 @@ object Proofs {
       case Decl(name, value) =>
         assert(Checker.isStmtClosed(stmt, keys)._2 == keys + name)
         assert(Interpreter.evalStmt(stmt, state).get._1 == state._1 + (name -> state._3))
-        sameKeyAdd(keys, state._1, name, state._3)
+        consistencySetkeySet(keys, state._1, name, state._3)
       case Assign(to, value) => ()
       case If(cond, body) => ()
       case Seq(s1, s2) =>
         assert(Checker.isStmtClosed(s1, keys)._1)
         assert(Interpreter.evalStmt(s1, state).isRight)
-        checkerInterpreterSameKeys(s1, state)
+        consistencyKeysCheckerInterpreter(s1, state)
         assert(
           Checker.isStmtClosed(s1, keys)._2
             == keySet(Interpreter.evalStmt(s1, state).get._1)
@@ -90,7 +88,7 @@ object Proofs {
             assert(mnames == keySet(mstate._1))
             assert(Checker.isStmtClosed(s2, keySet(mstate._1))._1)
             assert(Interpreter.evalStmt(s2, mstate).isRight)
-            checkerInterpreterSameKeys(s2, mstate)
+            consistencyKeysCheckerInterpreter(s2, mstate)
   }.ensuring( _ =>
     Checker.isStmtClosed(stmt, keySet(state._1))._2
       == keySet(Interpreter.evalStmt(stmt, state).get._1)
@@ -123,7 +121,7 @@ object Proofs {
           case Right(mstate) =>
             assert(Checker.isStmtClosed(s1, keys)._1)
             assert(Interpreter.evalStmt(s1, state).isRight)
-            checkerInterpreterSameKeys(s1, state)
+            consistencyKeysCheckerInterpreter(s1, state)
 
             val mnames = Checker.isStmtClosed(s1, keys)._2
             assert(Checker.isStmtClosed(s2, mnames)._1)
