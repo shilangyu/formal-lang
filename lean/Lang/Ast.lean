@@ -1,14 +1,14 @@
-structure Ident where
+structure Name where
   name : String
-deriving Repr
+deriving Repr, DecidableEq
 
 inductive Expr where
   | true
   | false
   | nand (left right : Expr)
-  | ident : Ident → Expr
-  | ref (of : Expr)
-  | deref (of : Expr)
+  | ident (name : Name)
+  -- | ref (of : Expr)
+  -- | deref (of : Expr)
   -- TODO: introduce structs
   -- | struct (fields : List struct_field)
   -- | struct_field (name : String) (value: Expr)
@@ -16,11 +16,11 @@ inductive Expr where
 deriving Repr
 
 inductive Stmt where
-  | decl (name : String) (value : Expr)
-  | assign (to : Expr) (value : Expr)
-  | if (condition : Expr) (body : Stmt)
-  | while (condition : Expr) (body : Stmt)
-  | block (statements : List Stmt)
-  | swap (left right : Expr)
-  | bye (ref : Ident)
+  | decl (name : Name) (value : Expr)
+  | assign (target : Name) (value : Expr)
+  | conditional (condition : Expr) (body : Stmt)
+  -- | while (condition : Expr) (body : Stmt)
+  -- | block (statements : List Stmt)
+  -- | swap (left right : Expr)
+  -- | bye (ref : Name)
 deriving Repr
