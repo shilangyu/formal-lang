@@ -20,6 +20,9 @@ abbrev Env := @AList Name (fun _ => Loc)
 /-- The memory maps variable locations to values. -/
 abbrev Memory := @AList Loc (fun _ => Bool)
 
+instance [Repr α] [∀ a, Repr (β a)] : ToString (@AList α β) where
+  toString l := "{" ++ (l.entries |> List.map (fun e => s!"{reprStr e.fst}: {reprStr e.snd}") |> String.intercalate ", ") ++ "}"
+
 /-- Returns a finite set of keys of an association list. -/
 def keySet {α : Type} {β : α → Type} (a : @AList α β) : Finset α :=
   Finset.mk (Multiset.ofList a.keys) a.nodupKeys
