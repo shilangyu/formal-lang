@@ -23,10 +23,10 @@ def typeCheckExpr (expr : Expr) (vars : Variables) : Bool := match expr with
   -- | Expr.ref of => Bool.true
   -- | Expr.deref of => Bool.true
 
--- def typeCheckStmt (stmt : Stmt) (env : Env) : Bool := match stmt with
---   | Stmt.decl name value =>  (AList.lookup name env).isNone && (typeCheckExpr value env)
---   | Stmt.assign target value => (AList.lookup target env).isSome && (typeCheckExpr value env)
---   | Stmt.conditional condition body => (typeCheckExpr condition env) && (typeCheckStmt body env)
+def typeCheckStmt (stmt : Stmt) (vars : Variables) : Bool := match stmt with
+  | Stmt.decl name value => name ∉ vars && typeCheckExpr value vars
+  | Stmt.assign target value => target ∈ vars && typeCheckExpr value vars
+  | Stmt.conditional condition body => typeCheckExpr condition vars && typeCheckStmt body vars
 
 /-! ## Properties -/
 
@@ -57,6 +57,32 @@ lemma typeCheckExpr_nandRight (h : typeCheckExpr (Expr.nand left right) vars) : 
 lemma typeCheckExpr_ident (h : typeCheckExpr (Expr.ident name) vars) : name ∈ vars := by
   unfold typeCheckExpr at h
   exact (Bool.coe_decide (name ∈ vars)).mp h
+
+/-- If Stmt.decl is type checked, then the value is type checked too. -/
+lemma typeCheckStmt_declValue (h : typeCheckStmt (Stmt.decl name value) vars) : typeCheckExpr value vars := by
+  exact Bool.and_elim_right h
+
+/-- If Stmt.assign is type checked, then the value is type checked too. -/
+lemma typeCheckStmt_assignValue (h : typeCheckStmt (Stmt.assign target value) vars) : typeCheckExpr value vars := by
+  exact Bool.and_elim_right h
+
+/-- If Stmt.assign is type checked, then the name exists in the `vars` set. -/
+lemma typeCheckStmt_assign (h : typeCheckStmt (Stmt.assign target value) vars) : target ∈ vars := by
+  unfold typeCheckStmt at h
+  apply Bool.and_elim_left at h
+  exact (Bool.coe_decide (target ∈ vars)).mp h
+
+/-- If Stmt.conditional is type checked, then the condition is type checked too. -/
+lemma typeCheckStmt_conditionalCond (h : typeCheckStmt (Stmt.conditional condition body) vars) : typeCheckExpr condition vars := by
+  unfold typeCheckStmt at h
+  apply Bool.and_elim_left at h
+  exact h
+
+/-- If Stmt.conditional is type checked, then the body is type checked too. -/
+lemma typeCheckStmt_conditionalBody (h : typeCheckStmt (Stmt.conditional condition body) vars) : typeCheckStmt body vars := by
+  unfold typeCheckStmt at h
+  apply Bool.and_elim_right at h
+  exact h
 
 /-- Given that the type checker accepts the expression, we know that the expression is closed. -/
 theorem typeCheckExpr_isClosedExpr (expr : Expr) (h : (typeCheckExpr expr vars)) : (isClosedExpr expr vars) := match expr with
