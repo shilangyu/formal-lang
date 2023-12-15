@@ -1,3 +1,10 @@
+/-!
+# AST
+
+This module defines the abstract syntax tree of the language.
+-/
+
+/-- A newtype for a string representing an identifier. -/
 structure Name where
   name : String
 deriving Repr, DecidableEq
