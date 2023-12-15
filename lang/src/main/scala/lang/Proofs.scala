@@ -12,17 +12,18 @@ import Conf.*
 object Proofs {
 
   def closedExprEvaluates(expr: Expr, state: State): Unit = {
-    require(Checker.isExprClosed(expr, state._1))
+    val env = state._1.head
+    require(Checker.isExprClosed(expr, env))
     expr match
       case True => ()
       case False => ()
       case Nand(left, right) =>
-        assert(Checker.isExprClosed(left, state._1))
-        assert(Checker.isExprClosed(right, state._1))
+        assert(Checker.isExprClosed(left, env))
+        assert(Checker.isExprClosed(right, env))
         closedExprEvaluates(left, state)
         closedExprEvaluates(right, state)
       case Ident(name) =>
-        assert(state._1.contains(name))
+        assert(env.contains(name))
         ()
   }.ensuring(
     Interpreter.evalExpr(expr, state) match
@@ -30,32 +31,48 @@ object Proofs {
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
 
-  def closedStmtEvaluates(stmt: Stmt, state: State): Unit = {
-    val env = state._1
-    require(Checker.isStmtClosed(stmt, env)._1)
+  /*
+  def closedStmtNoUndeclaredVar(stmt: Stmt, state: State): Unit = {
+    val envs = state._1
+    val env = envs.head
+    require(Checker.isStmtClosed(stmt, envs)._1)
     stmt match
       case Decl(name, value) =>
         closedExprEvaluates(value, state)
       case Assign(to, value) =>
         closedExprEvaluates(value, state)
-        assert(state._1.contains(to))
+        assert(env.contains(to))
       case If(cond, body) =>
         assert(Checker.isExprClosed(cond, env))
         closedExprEvaluates(cond, state)
-      case Seq(s1, _) =>
-        closedStmtEvaluates(s1, state)
+      case Seq(stmt1, _) =>
+        closedStmtNoUndeclaredVar(stmt1, state)
+      case Block(_, stmt1)            =>
+        closedStmtNoUndeclaredVar(stmt1, state)
   }.ensuring(
     Interpreter.traceStmt1(Cmd(stmt, state)) match
       case Right(_) => true
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
+  */
 
   /*
-  def test(stmt: Stmt, state: State): Unit = {
-    require(Interpreter.evalStmt(stmt, state).isRight)
-    val newState = Interpreter.evalStmt(stmt, state)
-  }.ensuring(Interpreter)
-  */
+  def noRedeclStmtNoRedeclaredVar(stmt: Stmt, state: State): Unit = {
+    val env = state._1
+    require(Checker.noRedecl(stmt, env)._1)
+    stmt match
+      case Decl(name, value) =>
+        assert(!state._1.contains(name))
+      case Assign(to, value) => ()
+      case If(cond, body) => ()
+      case Seq(s1, _) =>
+        noRedeclStmtNoRedeclaredVar(s1, state)
+  }.ensuring(
+    Interpreter.traceStmt1(Cmd(stmt, state)) match
+      case Right(_)         => true
+      case Left(exceptions) => !exceptions.contains(LangException.RedeclaredVariable)
+  )
+
 
   def locIncreases(stmt: Stmt, state: State): Unit = {
     decreases(stmt)
@@ -83,6 +100,14 @@ object Proofs {
           */
         case Cmd(_, newState) => newState._3 >= state._3
     )
+
+  */
+  /*
+  def test(stmt: Stmt, state: State): Unit = {
+    require(Interpreter.evalStmt(stmt, state).isRight)
+    val newState = Interpreter.evalStmt(stmt, state)
+  }.ensuring(Interpreter)
+  */
 
   /*
   def noDoubleLoc(stmt: Stmt, state: State): Unit = {

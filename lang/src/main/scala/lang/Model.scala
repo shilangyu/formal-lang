@@ -13,7 +13,7 @@ type Env = Map[Name, Loc]
 type Mem = Map[Loc, Boolean]
 
 // Loc is the first free location
-type State = (Env, Mem, Loc)
+type State = (List[Env], Mem, Loc)
 
 type Cmd = (Stmt, State)
 
@@ -29,3 +29,4 @@ enum LangException:
   case RedeclaredVariable
   case InvalidLoc
   case SeqinSeq
+  case EmptyEnvs
