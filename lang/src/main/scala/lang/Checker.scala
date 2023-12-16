@@ -20,28 +20,29 @@ object Checker {
   }
 
   // Check if there are access to undeclared variables
-  def isStmtClosed(stmt: Stmt, envs: List[Env]): (Boolean, List[Env]) = stmt match {
-    case Decl(name, value)   => 
-      val envs1 = envs.head.updated(name, 0)::envs.tail
-      (isExprClosed(value, envs.head), envs1)
-    case Assign(to, value)   => 
-      (envs.head.contains(to) && isExprClosed(value, envs.head), envs)
-    case If(cond, body)      =>
-      val (b, envs1) = isStmtClosed(body, envs)
-      (isExprClosed(cond, envs.head) && b, envs)
-    //case While(cond, body)   =>
-    //  val (b, nenv) = isStmtClosed(body, env)
-    //  (isExprClosed(cond, env) && b, nenv)
-    case Seq(stmt1, stmt2)         =>
-      val (b1, envs1) = isStmtClosed(stmt1, envs)
-      val (b2, envs2) = isStmtClosed(stmt2, envs1)
-      (b1 && b2, envs2)
-    case Block(_, stmt)            => 
-      val (b, envs1) = isStmtClosed(stmt, envs.head::envs) 
-      (b, envs1.tail)
-    //case Swap(e1, e2)        => isExprClosed(e1, envs.head) && isExprClosed(e2, envs.head)
-    //case Bye(n)              => envs.head.contains(n)
-  }
+  def isStmtClosed(stmt: Stmt, env: EnvList): (Boolean, EnvList) = 
+    stmt match
+      case Decl(name, value)    => 
+        val env1 = env.tail.push((env.head + (name -> 0)))
+        (isExprClosed(value, env1.head), env1)
+      case Assign(to, value)    => 
+        (env.head.contains(to) && isExprClosed(value, env.head), env)
+      case If(cond, body)       =>
+        val (b, _) = isStmtClosed(body, env)
+        (isExprClosed(cond, env.head) && b, env)
+      //case While(cond, body)   =>
+      //  val (b, nenv) = isStmtClosed(body, env)
+      //  (isExprClosed(cond, env) && b, nenv)
+      case Seq(stmt1, stmt2)    =>
+        val (b1, env1) = isStmtClosed(stmt1, env)
+        val (b2, env2) = isStmtClosed(stmt2, env1)
+        (b1 && b2, env2)
+      case Block(true, stmt)    => 
+        val (b, _) = isStmtClosed(stmt, env) 
+        (b, env)
+      case Block(false, stmt)   => 
+        val (b, env1) = isStmtClosed(stmt, env) 
+        (b, env1)
 
   /*
   def isProgClosed(prog: Stmt): (Boolean, Env) =

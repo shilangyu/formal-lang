@@ -97,61 +97,54 @@ object Interpreter {
     case Cmd(_, state) => state._1.length > 2
     */
 
-
-  def traceStmt1(conf: Conf): Either[Set[LangException], Conf] =
-    decreases(conf)
-    //require(twoEnvs(conf))
-    conf match
-      case St(state)  =>
-        Right(St(state))
-      case Cmd(stmt, state) => 
-        val envsTail = state._1.tail
-        val env = state._1.head
-        stmt match
-          case Decl(name, value)    => 
-            (env.get(name), evalExpr(value, state)) match
-            case (None(), Right(v))   =>
-              val loc = state._3
-              val env1 = env.updated(name,loc)
-              Right(St(env1::envsTail, state._2.updated(loc, v), loc + 1))
-            case (None(), Left(b))    => Left(b)
-            case (Some(_), Right(v))  => Left(Set(LangException.RedeclaredVariable)) 
-            case (Some(_), Left(b))   => Left(b + LangException.RedeclaredVariable)
-          case Assign(to, value)    => 
-            (env.get(to), evalExpr(value, state)) match
-            case (Some(loc), Right(v))  => state._2.get(loc) match
-              case Some(_) => Right(St(state._1, state._2.updated(loc, v), state._3))
-              case None()  => Left(Set(LangException.InvalidLoc))
-            case (Some(loc), Left(b))   => state._2.get(loc) match
-              case Some(_) => Left(b)
-              case None()  => Left(b + LangException.InvalidLoc)
-            case (None(), Right(_))     => Left(Set(LangException.UndeclaredVariable)) 
-            case (None(), Left(b))      => Left(b + LangException.UndeclaredVariable)
-          case If(cond, body)       => evalExpr(cond, state) match
-            case Left(b)  => Left(b) 
-            case Right(c) =>
-              if c then Right(Cmd(body, state))
-              else Right(St(state))
-          case Seq(stmt1, stmt2)          => traceStmt1(Cmd(stmt1, state)) match
-            case Left(b)  => Left(b)
-            case Right(c) => c match
-              case St(state1)         => Right(Cmd(stmt2, state1))
-              case Cmd(stmt1, state1) => Right(Cmd(Seq(stmt1, stmt2), state1)) 
-          case Block(true, stmt1)          => 
-            val statePush = (env::envsTail, state._2, state._3)     // entering the block
-            traceStmt1(Cmd(stmt1, statePush)) match
-            case Left(b)  => Left(b)
-            case Right(c) => c match
-              case St(state1)         => 
-                val state1pop = (state1._1.tail, state1._2, state1._3)
-                Right(St(state1pop))
-              case Cmd(stmt1, state1) => Right(Cmd(Block(false, stmt1), state1)) 
-          case Block(false, stmt1)          => traceStmt1(Cmd(stmt1, state)) match
-            case Left(b)  => Left(b)
-            case Right(c) => c match
-              case St(state1)         => 
-                val state1pop = (state1._1.tail, state1._2, state1._3)
-                Right(St(state1pop))
-              case Cmd(stmt2, state1) => Right(Cmd(Block(false, stmt2), state1)) 
+  def traceStmt1(stmt: Stmt, state: State): Either[Set[LangException], Conf] =
+    //decreases(conf)
+      val (env, mem, nl) = state
+      stmt match
+        case Decl(name, value)    => 
+          (env.head.get(name), evalExpr(value, state)) match
+          case (None(), Right(v))   =>
+            Right(St(env.tail.push(env.head + (name -> nl)), mem + (nl -> v), nl + 1))
+          case (None(), Left(b))    => Left(b)
+          case (Some(_), Right(v))  => Left(Set(LangException.RedeclaredVariable)) 
+          case (Some(_), Left(b))   => Left(b + LangException.RedeclaredVariable)
+        case Assign(to, value)    => 
+          (env.head.get(to), evalExpr(value, state)) match
+          case (Some(loc), Right(v))  => mem.get(loc) match
+            case Some(_) => Right(St(env, mem.updated(loc, v), nl))
+            case None()  => Left(Set(LangException.InvalidLoc))
+          case (Some(loc), Left(b))   => mem.get(loc) match
+            case Some(_) => Left(b)
+            case None()  => Left(b + LangException.InvalidLoc)
+          case (None(), Right(_))     => Left(Set(LangException.UndeclaredVariable)) 
+          case (None(), Left(b))      => Left(b + LangException.UndeclaredVariable)
+        case If(cond, body)       => evalExpr(cond, state) match
+          case Left(b)  => Left(b) 
+          case Right(c) =>
+            if c then Right(Cmd(body, state))
+            else Right(St(state))
+        case Seq(stmt1, stmt2)          => traceStmt1(stmt1, state) match
+          case Left(b)  => Left(b)
+          case Right(c) => c match
+            case St(state1)         => Right(Cmd(stmt2, state1))
+            case Cmd(stmt1, state1) => Right(Cmd(Seq(stmt1, stmt2), state1)) 
+        case Block(true, stmt1)          => 
+          val statePush = (env.push(env.head), mem, nl)     // entering the block
+          traceStmt1(stmt1, statePush) match
+          case Left(b)  => Left(b)
+          case Right(c) => c match
+            case St(state1)         => 
+              val (env1, mem1, nl1) = state1
+              val state1pop = (env1.tail, mem1, nl1)
+              Right(St(state1pop))
+            case Cmd(stmt1, state1) => Right(Cmd(Block(false, stmt1), state1)) 
+        case Block(false, stmt1)          => traceStmt1(stmt1, state) match
+          case Left(b)  => Left(b)
+          case Right(c) => c match
+            case St(state1)         => 
+              val (env1, mem1, nl1) = state1
+              val state1pop = (env1.tail, mem1, nl1)
+              Right(St(state1pop))
+            case Cmd(stmt2, state1) => Right(Cmd(Block(false, stmt2), state1)) 
 
 }

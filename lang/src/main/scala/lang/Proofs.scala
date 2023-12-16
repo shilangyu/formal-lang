@@ -31,30 +31,27 @@ object Proofs {
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
 
-  /*
   def closedStmtNoUndeclaredVar(stmt: Stmt, state: State): Unit = {
-    val envs = state._1
-    val env = envs.head
-    require(Checker.isStmtClosed(stmt, envs)._1)
+    val env = state._1
+    require(Checker.isStmtClosed(stmt, env)._1)
     stmt match
       case Decl(name, value) =>
         closedExprEvaluates(value, state)
       case Assign(to, value) =>
         closedExprEvaluates(value, state)
-        assert(env.contains(to))
+        assert(env.head.contains(to))
       case If(cond, body) =>
-        assert(Checker.isExprClosed(cond, env))
+        assert(Checker.isExprClosed(cond, env.head))
         closedExprEvaluates(cond, state)
       case Seq(stmt1, _) =>
         closedStmtNoUndeclaredVar(stmt1, state)
       case Block(_, stmt1)            =>
         closedStmtNoUndeclaredVar(stmt1, state)
   }.ensuring(
-    Interpreter.traceStmt1(Cmd(stmt, state)) match
+    Interpreter.traceStmt1(stmt, state) match
       case Right(_) => true
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
-  */
 
   /*
   def noRedeclStmtNoRedeclaredVar(stmt: Stmt, state: State): Unit = {
