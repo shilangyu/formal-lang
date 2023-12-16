@@ -9,35 +9,25 @@ import Stmt.*
 
 object Checker {
 
-  // Check if there are access to undeclared variables
-  def isExprClosed(expr: Expr, env: Env): Boolean = expr match {
-    case True       => true
-    case False      => true
-    case Nand(left, right) => isExprClosed(left, env) && isExprClosed(right, env)
-    case Ident(name)   => env.contains(name)
-    //case Ref(e)     => isExprClosed(e, env)
-    //case Deref(e)   => isExprClosed(e, env)
+  def exprIsClosed(expr: Expr, env: Set[Name]): Boolean = expr match {
+    case True              => true
+    case False             => true
+    case Nand(left, right) => exprIsClosed(left, env) && exprIsClosed(right, env)
+    case Ident(name)       => env.contains(name)
   }
 
-  // Check if there are access to undeclared variables
-  def isStmtClosed(stmt: Stmt, env: Env): (Boolean, Env) = stmt match {
-    case Decl(name, value)   => (isExprClosed(value, env), env.updated(name, 0))
-    case Assign(to, value)   => (env.contains(to) && isExprClosed(value, env), env)
-    case If(cond, body)      =>
-      val (b, nenv) = isStmtClosed(body, env)
-      (isExprClosed(cond, env) && b, env)
-    //case While(cond, body)   =>
-    //  val (b, nenv) = isStmtClosed(body, env)
-    //  (isExprClosed(cond, env) && b, nenv)
-    case Seq(s1, s2)         =>
-      val (b, nenv) = isStmtClosed(s1, env)
-      val (b2, nenv2) = isStmtClosed(s2, nenv)
-      (b && b2, nenv2)
-    //case Block(s)            => isClosed(s,envs.head::envs) 
-    //case Swap(e1, e2)        => isExprClosed(e1, envs.head) && isExprClosed(e2, envs.head)
-    //case Bye(n)              => envs.head.contains(n)
+  def stmtIsClosed(stmt: Stmt, env: Set[Name]): (Boolean, Set[Name]) = stmt match {
+    case Decl(name, value) => (exprIsClosed(value, env), env + name)
+    case Assign(to, value) => (env.contains(to) && exprIsClosed(value, env), env)
+    case If(cond, body)    =>
+      val (b, _) = stmtIsClosed(body, env)
+      (exprIsClosed(cond, env) && b, env)
+    case Seq(stmt1, stmt2) =>
+      val (s1, menv) = stmtIsClosed(stmt1, env)
+      val (s2, nenv) = stmtIsClosed(stmt2, menv)
+      (s1 && s2, nenv)
   }
 
-  def isProgClosed(prog: Stmt): (Boolean, Env) =
-    isStmtClosed(prog, Map.empty[Name, Loc])
+  def progIsClosed(prog: Stmt): (Boolean, Set[Name]) =
+    stmtIsClosed(prog, Set.empty)
 }

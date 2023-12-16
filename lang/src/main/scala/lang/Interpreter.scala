@@ -8,6 +8,7 @@ import Expr.*
 import Stmt.*
 import Conf.*
 
+
 object Interpreter {
 
   def evalExpr(expr: Expr, state: State): Either[Set[LangException], Boolean] = expr match
@@ -25,85 +26,45 @@ object Interpreter {
           state._2.get(loc) match
             case Some(value) => Right(value)
             case None()      => Left(Set(LangException.InvalidLoc))
-        case None()      => Left(Set(LangException.UndeclaredVariable))
-    //case Expr.Ref(e)     => isExprClosed(e, env)
-    //case Expr.Deref(e)   => isExprClosed(e, env)
+        case None()    => Left(Set(LangException.UndeclaredVariable))
 
-  def evalStmt(stmt: Stmt, state: State): Either[Set[LangException], State] = stmt match
-    case Decl(name, value) =>
-      (state._1.get(name), evalExpr(value, state)) match
-        case (None(), Right(v)) =>
-          val loc = state._3
-          Right((state._1.updated(name, loc), state._2.updated(loc, v), loc + 1))
-        case (None(), Left(b)) => Left(b)
-        case (Some(_), Right(v)) => Left(Set(LangException.RedeclaredVariable)) 
-        case (Some(_), Left(b)) => Left(b + LangException.RedeclaredVariable)
-    case Assign(to, value) =>
-      (state._1.get(to), evalExpr(value, state)) match
-        case (Some(loc), Right(v)) =>
-          state._2.get(loc) match
-            case Some(_) => Right((state._1, state._2.updated(loc, v), state._3))
-            case None()  => Left(Set(LangException.InvalidLoc))
-        case (Some(loc), Left(b)) =>
-          state._2.get(loc) match
-            case Some(_) => Left(b)
-            case None()  => Left(b + LangException.InvalidLoc)
-        case (None(), Right(_)) => Left(Set(LangException.UndeclaredVariable)) 
-        case (None(), Left(b)) => Left(b + LangException.UndeclaredVariable)
-    case If(cond, body) =>
-      evalExpr(cond, state) match
-        case Left(b) => Left(b) 
+
+  def evalStmt1(stmt: Stmt, state: State): Either[Set[LangException], Conf] =
+    val (env, mem, nl) = state
+    stmt match
+      case Decl(name, value)  => 
+        (env.contains(name), evalExpr(value, state)) match
+        case (false, Right(v)) =>
+          Right(St(env + (name -> nl), mem + (nl -> v), nl + 1))
+        case (false, Left(b))  => Left(b)
+        case (true, Right(v))  => Left(Set(LangException.RedeclaredVariable)) 
+        case (true, Left(b))   => Left(b + LangException.RedeclaredVariable)
+      case Assign(to, value)  => 
+        (env.get(to), evalExpr(value, state)) match
+        case (Some(loc), Right(v)) => mem.contains(loc) match
+          case true  => Right(St(env, mem.updated(loc, v), nl))
+          case false => Left(Set(LangException.InvalidLoc))
+        case (Some(loc), Left(b))  => mem.contains(loc) match
+          case true  => Left(b)
+          case false => Left(b + LangException.InvalidLoc)
+        case (None(), Right(_))    => Left(Set(LangException.UndeclaredVariable)) 
+        case (None(), Left(b))     => Left(b + LangException.UndeclaredVariable)
+      case If(cond, body)    => evalExpr(cond, state) match
+        case Left(b)  => Left(b)
         case Right(c) =>
-          if c then
-            evalStmt(body, state) match
-              case Left(b2) => Left(b2) 
-              case Right(_) => Right(state)     // fix this
-          else Right(state)
-    //case w @ While(cond, body) =>
-    //  evalExpr(cond, state) match
-    //    case Left(b) => Left(b) 
-    //    case Right(c) =>
-    //      if c then
-    //        evalStmt(body, state) match
-    //          case Left(b) => Left(b) 
-    //          case Right(s) => Right(s) // evalStmt(w, s)
-    //      else Right(state)
-    case Seq(s1, s2) =>          
-      evalStmt(s1, state) match
-        case Left(b) => Left(b) 
-        case Right(s) => evalStmt(s2, s)
+          if c then Right(Cmd(body, state)) else Right(St(state))
+      case Seq(stmt1, stmt2)  => evalStmt1(stmt1, state) match
+        case Left(b)  => Left(b)
+        case Right(c) => c match
+          case St(nstate)          => Right(Cmd(stmt2, nstate))
+          case Cmd(nstmt1, nstate) => Right(Cmd(Seq(nstmt1, stmt2), nstate))
 
-
-  def traceStmt1(conf: Conf): Either[Set[LangException], Conf] =
-    decreases(conf)
-    conf match
-      case St(state)  => Right(St(state))
-      case Cmd(stmt, state) => stmt match
-        case Decl(name, value)    => (state._1.get(name), evalExpr(value, state)) match
-          case (None(), Right(v))   =>
-            val loc = state._3
-            Right(St(state._1.updated(name, loc), state._2.updated(loc, v), loc + 1))
-          case (None(), Left(b))    => Left(b)
-          case (Some(_), Right(v))  => Left(Set(LangException.RedeclaredVariable)) 
-          case (Some(_), Left(b))   => Left(b + LangException.RedeclaredVariable)
-        case Assign(to, value)    => (state._1.get(to), evalExpr(value, state)) match
-          case (Some(loc), Right(v))  => state._2.get(loc) match
-            case Some(_) => Right(St(state._1, state._2.updated(loc, v), state._3))
-            case None()  => Left(Set(LangException.InvalidLoc))
-          case (Some(loc), Left(b))   => state._2.get(loc) match
-            case Some(_) => Left(b)
-            case None()  => Left(b + LangException.InvalidLoc)
-          case (None(), Right(_))     => Left(Set(LangException.UndeclaredVariable)) 
-          case (None(), Left(b))      => Left(b + LangException.UndeclaredVariable)
-        case If(cond, body)       => evalExpr(cond, state) match
-          case Left(b)  => Left(b) 
-          case Right(c) =>
-            if c then Right(Cmd(body, state))
-            else Right(St(state))
-        case Seq(s1, s2)          => traceStmt1(Cmd(s1, state)) match
-          case Left(b)  => Left(b)
-          case Right(c) => c match
-            case St(newState)         => Right(Cmd(s2, newState))
-            case Cmd(newS1, newState) => Right(Cmd(Seq(newS1, s2), newState)) 
-
+  
+  def evalStmt(stmt: Stmt, state: State): Either[Set[LangException], State] =
+    evalStmt1(stmt, state) match
+      case Left(b) => Left(b) 
+      case Right(conf) => conf match
+        case St(fstate) => Right(fstate)
+        case Cmd(nstmt, nstate) => evalStmt(nstmt, nstate)
+  
 }

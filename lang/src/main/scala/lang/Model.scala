@@ -15,17 +15,41 @@ type Mem = Map[Loc, Boolean]
 // Loc is the first free location
 type State = (Env, Mem, Loc)
 
-type Cmd = (Stmt, State)
-
-//type Conf = State | Cmd
-
 enum Conf:
-  case St(st: State)
-  case Cmd(stmt: Stmt, st: State)
+  case St(state: State)
+  case Cmd(stmt: Stmt, state: State)
 
 
 enum LangException:
   case UndeclaredVariable
   case RedeclaredVariable
+  
   case InvalidLoc
-  case SeqinSeq
+
+// ---
+
+import stainless.annotation.extern
+
+@extern
+def keySet[K, V](map: Map[K, V]): Set[K] = {
+  Set.fromScala(map.theMap.keys.toSet)
+}
+
+@extern
+def keySetPost[K, V](map: Map[K, V], key: K): Unit = {
+}.ensuring( _ =>
+  map.contains(key) == keySet(map).contains(key)
+)
+
+@extern
+def emptyKeySet[K, V](): Unit = {
+}.ensuring( _ =>
+  Set.empty[K] == keySet(Map.empty[K, V])
+)
+
+@extern
+def consistentKeySet[K, V](set: Set[K], map: Map[K, V], key: K, value: V): Unit = {
+  require(set == keySet(map))
+}.ensuring( _ =>
+  set + key == keySet(map + (key -> value))
+)
