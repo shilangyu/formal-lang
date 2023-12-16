@@ -1,4 +1,5 @@
 import Lang.Ast
+import Lang.Helpers
 import Mathlib.Data.Finset.Basic
 
 /-!
@@ -25,7 +26,7 @@ def typeCheckExpr (expr : Expr) (vars : Variables) : Bool := match expr with
 def typeCheckStmt (stmt : Stmt) (vars : Variables) : Option Variables := match stmt with
     | Stmt.decl name value =>
       if name ∉ vars then
-        let newVar := (insert name vars)
+        let newVar := insert name vars
         if typeCheckExpr value vars then
           some newVar
         else
@@ -46,7 +47,19 @@ def isClosedExpr (expr : Expr) (vars : Variables) : Bool := match expr with
   | Expr.nand left right => (isClosedExpr left vars) && (isClosedExpr right vars)
   | Expr.ident name => name ∈ vars
 
-/-! ## Theorems -/
+/-- A statement is closed if accessed variables exist. -/
+def isClosedStmt (stmt : Stmt) (vars : Variables) : Bool := (aux stmt vars).isSome
+where
+  aux stmt vars := match stmt with
+    | Stmt.decl name value =>
+        if isClosedExpr value vars then
+          some (insert name vars)
+        else
+          none
+    | Stmt.assign target value => if target ∈ vars && isClosedExpr value vars then some vars else none
+    | Stmt.conditional condition body => if isClosedExpr condition vars && (aux body vars).isSome then some vars else none
+
+/-! ## Proofs -/
 
 /-- If Expr.nand is type checked, then lhs is type checked too. -/
 lemma typeCheckExpr_nandLeft (h : typeCheckExpr (Expr.nand left right) vars) : typeCheckExpr left vars := by
@@ -113,21 +126,87 @@ lemma typeCheckStmt_conditionalBody (h : isTypeCheckedStmt (Stmt.conditional con
   · simp [Bool.false_and, hn] at h
 
 /-- Given that the type checker accepts the expression, we know that the expression is closed. -/
-theorem typeCheckExpr_isClosedExpr (expr : Expr) (h : (typeCheckExpr expr vars)) : (isClosedExpr expr vars) := match expr with
+@[simp] theorem typeCheckExpr_isClosedExpr (expr : Expr) (h : (typeCheckExpr expr vars)) : (isClosedExpr expr vars) := match expr with
   | Expr.true => by
-    apply h
+      apply h
   | Expr.false => by
-    apply h
+      apply h
   | Expr.nand left right => by
-    unfold typeCheckExpr at h
-    unfold isClosedExpr
-    simp [Bool.coe_and_iff] at h
-    simp [Bool.coe_and_iff]
-    have l := And.left h
-    have r := And.right h
+      unfold typeCheckExpr at h
+      unfold isClosedExpr
+      simp [Bool.coe_and_iff] at h
+      simp [Bool.coe_and_iff]
+      have l := And.left h
+      have r := And.right h
 
-    have lp := by apply (typeCheckExpr_isClosedExpr left l)
-    have rp := by apply (typeCheckExpr_isClosedExpr right r)
-    exact ⟨lp, rp⟩
+      have lp := by apply (typeCheckExpr_isClosedExpr left l)
+      have rp := by apply (typeCheckExpr_isClosedExpr right r)
+      exact ⟨lp, rp⟩
   | Expr.ident _ => by
-    apply h
+      apply h
+
+/-- Given that the type checker accepts the statement, we know that the statement is closed. -/
+theorem typeCheckStmt_isClosedStmt (stmt : Stmt) (h : (isTypeCheckedStmt stmt vars)) : (isClosedStmt stmt vars) := match stmt with
+    | Stmt.decl name value => by
+        unfold isTypeCheckedStmt at h
+        unfold typeCheckStmt at h
+        unfold isClosedStmt
+        unfold isClosedStmt.aux
+
+        by_cases hn : name ∉ vars
+        · simp [ite_true, hn] at h
+          split
+          · exact Option.isSome_some
+          · case _ ht =>
+            simp [Option.isSome_none]
+            simp [Option.isSome_none] at ht
+            by_cases hp : typeCheckExpr value vars
+            · apply typeCheckExpr_isClosedExpr at hp
+              simp_all
+            · simp [*] at h
+        · simp [ite_false, hn] at h
+    | Stmt.assign target value => by
+        unfold isTypeCheckedStmt at h
+        unfold typeCheckStmt at h
+        unfold isClosedStmt
+        unfold isClosedStmt.aux
+
+        by_cases hn : target ∉ vars
+        · simp [*]
+          simp [*] at h
+        · simp_all
+          split
+          · case _ ht => exact Option.isSome_some
+          · case _ ht =>
+            simp [Option.isSome_none]
+            simp [Option.isSome_none] at ht
+            split at h
+            · case _ hu =>
+              apply typeCheckExpr_isClosedExpr at hu
+              simp_all
+            · simp [*] at h
+    | Stmt.conditional condition body => by
+        unfold isTypeCheckedStmt at h
+        unfold typeCheckStmt at h
+        unfold isClosedStmt
+        unfold isClosedStmt.aux
+
+        split
+        · simp
+        · case _ ht =>
+          split at h
+          · case _ hu =>
+            rw [Bool.eq_false_eq_not_eq_true] at ht
+            have hul := by apply Bool.and_elim_left hu
+            have hur := by apply Bool.and_elim_right hu
+            clear hu h
+
+            rw [Bool.and_eq_false_eq_eq_false_or_eq_false] at ht
+            simp_all
+            clear hul
+
+            apply typeCheckStmt_isClosedStmt at hur
+            rw [isClosedStmt] at hur
+            exact Option.isSome_isNone_contr hur ht
+          · exact h
+decreasing_by sorry -- TODO: no clue how to prove termination
