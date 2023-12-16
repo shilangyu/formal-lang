@@ -1,7 +1,6 @@
 import Lang.Ast
 import Mathlib.Data.Finset.Basic
 
-
 /-!
 # Static checker
 
@@ -23,10 +22,20 @@ def typeCheckExpr (expr : Expr) (vars : Variables) : Bool := match expr with
   -- | Expr.ref of => Bool.true
   -- | Expr.deref of => Bool.true
 
-def typeCheckStmt (stmt : Stmt) (vars : Variables) : Bool := match stmt with
-  | Stmt.decl name value => name ∉ vars && typeCheckExpr value vars
-  | Stmt.assign target value => target ∈ vars && typeCheckExpr value vars
-  | Stmt.conditional condition body => typeCheckExpr condition vars && typeCheckStmt body vars
+def typeCheckStmt (stmt : Stmt) (vars : Variables) : Option Variables := match stmt with
+    | Stmt.decl name value =>
+      if name ∉ vars then
+        let newVar := (insert name vars)
+        if typeCheckExpr value vars then
+          some newVar
+        else
+          none
+      else none
+    | Stmt.assign target value => if target ∈ vars && typeCheckExpr value vars then some vars else none
+    | Stmt.conditional condition body => if typeCheckExpr condition vars && (typeCheckStmt body vars).isSome then some vars else none
+
+/-- The assertion that `typeCheckStmt` accepted the input, ie it is not `none`. -/
+def isTypeCheckedStmt (stmt : Stmt) (vars : Variables) := (typeCheckStmt stmt vars).isSome
 
 /-! ## Properties -/
 
@@ -59,30 +68,49 @@ lemma typeCheckExpr_ident (h : typeCheckExpr (Expr.ident name) vars) : name ∈ 
   exact (Bool.coe_decide (name ∈ vars)).mp h
 
 /-- If Stmt.decl is type checked, then the value is type checked too. -/
-lemma typeCheckStmt_declValue (h : typeCheckStmt (Stmt.decl name value) vars) : typeCheckExpr value vars := by
-  exact Bool.and_elim_right h
+lemma typeCheckStmt_declValue (h : isTypeCheckedStmt (Stmt.decl name value) vars) : typeCheckExpr value vars := by
+  rw [isTypeCheckedStmt] at h
+  unfold typeCheckStmt at h
+  by_cases hn : name ∉ vars
+  · simp [ite_false, hn] at h
+    by_cases ht : typeCheckExpr value vars
+    · simp [ite_false, ht] at h
+      assumption
+    · simp [ite_false, ht] at h
+  ·  simp [ite_true, hn] at h
 
 /-- If Stmt.assign is type checked, then the value is type checked too. -/
-lemma typeCheckStmt_assignValue (h : typeCheckStmt (Stmt.assign target value) vars) : typeCheckExpr value vars := by
-  exact Bool.and_elim_right h
+lemma typeCheckStmt_assignValue (h : isTypeCheckedStmt (Stmt.assign target value) vars) : typeCheckExpr value vars := by
+  rw [isTypeCheckedStmt] at h
+  unfold typeCheckStmt at h
+  by_cases hn : (decide (target ∈ vars) && typeCheckExpr value vars)
+  · simp [ite_false, hn] at h
+    exact Bool.and_elim_right hn
+  · simp_all only [ite_false, Option.isSome_none]
 
 /-- If Stmt.assign is type checked, then the name exists in the `vars` set. -/
-lemma typeCheckStmt_assign (h : typeCheckStmt (Stmt.assign target value) vars) : target ∈ vars := by
+lemma typeCheckStmt_assign (h : isTypeCheckedStmt (Stmt.assign target value) vars) : target ∈ vars := by
+  rw [isTypeCheckedStmt] at h
   unfold typeCheckStmt at h
-  apply Bool.and_elim_left at h
-  exact (Bool.coe_decide (target ∈ vars)).mp h
+  by_cases hn : target ∈ vars
+  · assumption
+  · simp [Bool.false_and, hn] at h
 
 /-- If Stmt.conditional is type checked, then the condition is type checked too. -/
-lemma typeCheckStmt_conditionalCond (h : typeCheckStmt (Stmt.conditional condition body) vars) : typeCheckExpr condition vars := by
+lemma typeCheckStmt_conditionalCond (h : isTypeCheckedStmt (Stmt.conditional condition body) vars) : typeCheckExpr condition vars := by
+  rw [isTypeCheckedStmt] at h
   unfold typeCheckStmt at h
-  apply Bool.and_elim_left at h
-  exact h
+  by_cases hn : typeCheckExpr condition vars && Option.isSome (typeCheckStmt body vars)
+  · exact Bool.and_elim_left hn
+  · simp [Bool.false_and, hn] at h
 
 /-- If Stmt.conditional is type checked, then the body is type checked too. -/
-lemma typeCheckStmt_conditionalBody (h : typeCheckStmt (Stmt.conditional condition body) vars) : typeCheckStmt body vars := by
+lemma typeCheckStmt_conditionalBody (h : isTypeCheckedStmt (Stmt.conditional condition body) vars) : isTypeCheckedStmt body vars := by
+  rw [isTypeCheckedStmt] at h
   unfold typeCheckStmt at h
-  apply Bool.and_elim_right at h
-  exact h
+  by_cases hn : typeCheckExpr condition vars && Option.isSome (typeCheckStmt body vars)
+  · exact Bool.and_elim_right hn
+  · simp [Bool.false_and, hn] at h
 
 /-- Given that the type checker accepts the expression, we know that the expression is closed. -/
 theorem typeCheckExpr_isClosedExpr (expr : Expr) (h : (typeCheckExpr expr vars)) : (isClosedExpr expr vars) := match expr with

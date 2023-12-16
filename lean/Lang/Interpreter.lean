@@ -43,7 +43,7 @@ def evalExpr (expr : Expr) (env : Env) (mem : Memory) (h : typeCheckExpr expr (k
     let loc := AList.get name env (typeCheckExpr_ident h)
     sorry -- TODO: retrieve from memory
 
-def evalStmt (stmt : Stmt) (env : Env) (mem : Memory) (h : typeCheckStmt stmt (keySet env)) : Env × Memory := match stmt with
+def evalStmt (stmt : Stmt) (env : Env) (mem : Memory) (h : isTypeCheckedStmt stmt (keySet env)) : Env × Memory := match stmt with
   | Stmt.decl name value =>
     let v := evalExpr value env mem (typeCheckStmt_declValue h)
     sorry -- TODO: store into memory
