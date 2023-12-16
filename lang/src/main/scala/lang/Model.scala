@@ -13,7 +13,7 @@ type Env = Map[Name, Loc]
 type Mem = Map[Loc, Boolean]
 
 // Loc is the first free location
-type State = (Env, Mem, Loc)
+type State = (List[Env], Mem, Loc)
 
 enum Conf:
   case St(state: State)
