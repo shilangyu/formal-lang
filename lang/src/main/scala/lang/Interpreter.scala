@@ -137,21 +137,21 @@ object Interpreter {
             case Right(c) => c match
               case St(state1)         => Right(Cmd(stmt2, state1))
               case Cmd(stmt1, state1) => Right(Cmd(Seq(stmt1, stmt2), state1)) 
-          case Block(true, stmt)          => 
+          case Block(true, stmt1)          => 
             val statePush = (env::envsTail, state._2, state._3)     // entering the block
-            traceStmt1(Cmd(stmt, statePush)) match
+            traceStmt1(Cmd(stmt1, statePush)) match
             case Left(b)  => Left(b)
             case Right(c) => c match
               case St(state1)         => 
                 val state1pop = (state1._1.tail, state1._2, state1._3)
                 Right(St(state1pop))
               case Cmd(stmt1, state1) => Right(Cmd(Block(false, stmt1), state1)) 
-          case Block(false, stmt)          => traceStmt1(Cmd(stmt, state)) match
+          case Block(false, stmt1)          => traceStmt1(Cmd(stmt1, state)) match
             case Left(b)  => Left(b)
             case Right(c) => c match
               case St(state1)         => 
                 val state1pop = (state1._1.tail, state1._2, state1._3)
                 Right(St(state1pop))
-              case Cmd(stmt1, state1) => Right(Cmd(Block(false, stmt1), state1)) 
+              case Cmd(stmt2, state1) => Right(Cmd(Block(false, stmt2), state1)) 
 
 }
