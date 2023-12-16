@@ -59,6 +59,18 @@ where
     | Stmt.assign target value => if target ∈ vars && isClosedExpr value vars then some vars else none
     | Stmt.conditional condition body => if isClosedExpr condition vars && (aux body vars).isSome then some vars else none
 
+/-- A statement has no redeclarations if each declaration uses a unique name. -/
+def hasNoRedeclarations (stmt : Stmt) (vars : Variables) : Bool := (aux stmt vars).isSome
+where
+  aux stmt vars : Option Variables := match stmt with
+    | Stmt.decl name _ =>
+        if name ∉ vars then
+          some (insert name vars)
+        else
+          none
+    | Stmt.assign _ _ => some vars
+    | Stmt.conditional _ body => aux body vars
+
 /-! ## Proofs -/
 
 /-- If Expr.nand is type checked, then lhs is type checked too. -/
@@ -126,27 +138,27 @@ lemma typeCheckStmt_conditionalBody (h : isTypeCheckedStmt (Stmt.conditional con
   · simp [Bool.false_and, hn] at h
 
 /-- Given that the type checker accepts the expression, we know that the expression is closed. -/
-@[simp] theorem typeCheckExpr_isClosedExpr (expr : Expr) (h : (typeCheckExpr expr vars)) : (isClosedExpr expr vars) := match expr with
+@[simp] theorem typeCheckExpr_isClosedExpr (expr : Expr) (h : typeCheckExpr expr vars) : (isClosedExpr expr vars) := match expr with
   | Expr.true => by
       apply h
   | Expr.false => by
       apply h
   | Expr.nand left right => by
-      unfold typeCheckExpr at h
-      unfold isClosedExpr
-      simp [Bool.coe_and_iff] at h
-      simp [Bool.coe_and_iff]
-      have l := And.left h
-      have r := And.right h
+      have l := typeCheckExpr_nandLeft h
+      have r := typeCheckExpr_nandRight h
 
-      have lp := by apply (typeCheckExpr_isClosedExpr left l)
-      have rp := by apply (typeCheckExpr_isClosedExpr right r)
+      unfold isClosedExpr
+      simp [Bool.coe_and_iff]
+
+      have lp := typeCheckExpr_isClosedExpr left l
+      have rp := typeCheckExpr_isClosedExpr right r
+
       exact ⟨lp, rp⟩
   | Expr.ident _ => by
       apply h
 
 /-- Given that the type checker accepts the statement, we know that the statement is closed. -/
-theorem typeCheckStmt_isClosedStmt (stmt : Stmt) (h : (isTypeCheckedStmt stmt vars)) : (isClosedStmt stmt vars) := match stmt with
+theorem typeCheckStmt_isClosedStmt (stmt : Stmt) (h : isTypeCheckedStmt stmt vars) : (isClosedStmt stmt vars) := match stmt with
     | Stmt.decl name value => by
         unfold isTypeCheckedStmt at h
         unfold typeCheckStmt at h
@@ -210,3 +222,33 @@ theorem typeCheckStmt_isClosedStmt (stmt : Stmt) (h : (isTypeCheckedStmt stmt va
             exact Option.isSome_isNone_contr hur ht
           · exact h
 decreasing_by sorry -- TODO: no clue how to prove termination
+
+/-- Given that the type checker accepts the statement, we know there are no redeclared variables in the statement. -/
+theorem typeCheckStmt_hasNoRedeclarations (stmt : Stmt) (h : isTypeCheckedStmt stmt vars) : hasNoRedeclarations stmt vars := match stmt with
+    | Stmt.decl name _ => by
+      unfold isTypeCheckedStmt at h
+      unfold typeCheckStmt at h
+      unfold hasNoRedeclarations
+      unfold hasNoRedeclarations.aux
+
+      split
+      · simp
+      · case _ ht =>
+        simp [ite_false, ht] at h
+    | Stmt.assign _ _ => by
+      unfold hasNoRedeclarations
+      apply Eq.refl
+    | Stmt.conditional _ body => by
+      unfold isTypeCheckedStmt at h
+      unfold typeCheckStmt at h
+      unfold hasNoRedeclarations
+      unfold hasNoRedeclarations.aux
+
+      split at h
+      · case _ ht =>
+        apply Bool.and_elim_right at ht
+        rw [← isTypeCheckedStmt] at ht
+        apply typeCheckStmt_hasNoRedeclarations
+        exact ht
+      · case _ ht =>
+        simp_all only [Bool.and_eq_true, not_and, Bool.not_eq_true, Option.not_isSome, Option.isSome_none]
