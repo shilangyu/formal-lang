@@ -123,6 +123,11 @@ object Interpreter {
           case Right(c) =>
             if c then Right(Cmd(body, state))
             else Right(St(state))
+        case While(cond, body)    => evalExpr(cond, state) match
+          case Left(b)  => Left(b) 
+          case Right(c) =>
+            if c then Right(Cmd(Seq(body, stmt), state))
+            else Right(St(state))
         case Seq(stmt1, stmt2)          => traceStmt1(stmt1, state) match
           case Left(b)  => Left(b)
           case Right(c) => c match

@@ -35,17 +35,24 @@ object Proofs {
     val env = state._1
     require(Checker.isStmtClosed(stmt, env)._1)
     stmt match
-      case Decl(name, value) =>
+      case Decl(name, value)  =>
         closedExprEvaluates(value, state)
-      case Assign(to, value) =>
+      case Assign(to, value)  =>
         closedExprEvaluates(value, state)
         assert(env.head.contains(to))
-      case If(cond, body) =>
+      case If(cond, body)     =>
         assert(Checker.isExprClosed(cond, env.head))
         closedExprEvaluates(cond, state)
-      case Seq(stmt1, _) =>
+      case While(cond, body)     =>
+        assert(Checker.isExprClosed(cond, env.head))
+        closedExprEvaluates(cond, state)
+      case Seq(stmt1, _)      =>
         closedStmtNoUndeclaredVar(stmt1, state)
-      case Block(_, stmt1)            =>
+      case Block(true, stmt1)   =>
+        assert(env.head == env.push(env.head).head)
+        assert(Checker.isStmtClosed(stmt1, env.push(env.head))._1)
+        closedStmtNoUndeclaredVar(stmt1, (env.push(env.head), state._2, state._3))
+      case Block(false, stmt1)  =>
         closedStmtNoUndeclaredVar(stmt1, state)
   }.ensuring(
     Interpreter.traceStmt1(stmt, state) match
@@ -59,46 +66,56 @@ object Proofs {
     require(Checker.noRedecl(stmt, env)._1)
     stmt match
       case Decl(name, value) =>
-        assert(!state._1.contains(name))
+        assert(!env.head.contains(name))
       case Assign(to, value) => ()
-      case If(cond, body) => ()
-      case Seq(s1, _) =>
-        noRedeclStmtNoRedeclaredVar(s1, state)
+      case If(cond, body) =>
+        assert(body.isInstanceOf[Block])
+      case Seq(stmt1, _) =>
+        noRedeclStmtNoRedeclaredVar(stmt1, state)
+      case Block(true, stmt1)   =>
+        assert(Checker.noRedecl(stmt1, env.push(env.head))._1)
+        noRedeclStmtNoRedeclaredVar(stmt1, (env.push(env.head), state._2, state._3))
+      case Block(false, stmt1)  =>
+        assert(Checker.noRedecl(stmt1, env)._1)
+        noRedeclStmtNoRedeclaredVar(stmt1, state)
   }.ensuring(
-    Interpreter.traceStmt1(Cmd(stmt, state)) match
+    Interpreter.traceStmt1(stmt, state) match
       case Right(_)         => true
       case Left(exceptions) => !exceptions.contains(LangException.RedeclaredVariable)
   )
-
+  */
 
   def locIncreases(stmt: Stmt, state: State): Unit = {
     decreases(stmt)
-
+    val env = state._1
     stmt match
       case Decl(_, _)   =>
-        Interpreter.traceStmt1(Cmd(stmt, state)) match
+        Interpreter.traceStmt1(stmt, state) match
           case Left(_)      => ()
           case Right(conf)  => conf match
-            case St(newState) =>
-              assert(newState._3 == state._3 + 1)
+            case St(state1) =>
+              assert(state1._3 == state._3 + 1)
             case _ => ()
-      case Seq(s1, _)   => 
-        locIncreases(s1, state)
+      case While(cond, body) => ()
+      case Seq(stmt1, _)   => 
+        locIncreases(stmt1, state)
+      case Block(true, stmt1)   => 
+        locIncreases(stmt1, (env.push(env.head), state._2, state._3))
+      case Block(false, stmt1)   => 
+        locIncreases(stmt1, state)
       case _            => ()
-
   }.ensuring(
-    Interpreter.traceStmt1(Cmd(stmt, state)) match
+    Interpreter.traceStmt1(stmt, state) match
       case Left(_) => true
       case Right(conf) => conf match
-        case St(newState) => newState._3 >= state._3
+        case St(state1) => state1._3 >= state._3
 /*
           if stmt.isInstanceOf[Decl] then newState._3 == state._3 + 1
           else newState._3 == state._3
           */
-        case Cmd(_, newState) => newState._3 >= state._3
+        case Cmd(_, state1) => state1._3 >= state._3
     )
 
-  */
   /*
   def test(stmt: Stmt, state: State): Unit = {
     require(Interpreter.evalStmt(stmt, state).isRight)
