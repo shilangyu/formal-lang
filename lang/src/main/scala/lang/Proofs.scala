@@ -4,7 +4,7 @@ import stainless.*
 import stainless.lang.*
 import stainless.collection.*
 
-import stainless.annotation.extern
+import stainless.annotation.{extern, pure}
 import stainless.proof.check
 
 import Expr.*
@@ -35,6 +35,89 @@ object Proofs {
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
 
+  @extern @pure
+  def axiom2(stmt: Stmt, state: State): Unit = {
+    require(state._1.nonEmpty)
+    require(state._1 != Nil())
+    val keys = keySet(state._1.head)
+    require(Checker.stmtIsClosed(stmt, keys)._1)
+  }.ensuring(
+    Interpreter.evalStmt1(stmt, state) match
+      case Left(_) => true 
+      case Right(conf) => conf match
+        case St(nstate) =>
+          nstate._1.nonEmpty
+          && (nstate._1 != Nil())
+          && (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
+            == keySet(nstate._1.head))
+        case Cmd(nstmt, nstate) =>
+          nstate._1.nonEmpty
+          && (nstate._1 != Nil())
+          && (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
+            == Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2)
+  )
+
+  def closedStmtEval1(stmt: Stmt, state: State): Unit = {
+    require(state._1.nonEmpty)
+    val keys = keySet(state._1.head)
+    require(Checker.stmtIsClosed(stmt, keys)._1)
+    Interpreter.axiom1(stmt, state)  // REMOVE
+    axiom2(stmt, state)  // REMOVE
+    stmt match
+      case Decl(name, value) =>
+        closedExprEval(value, state)
+      case Assign(to, value) =>
+        closedExprEval(value, state)
+        keySetPost(state._1.head, to)
+        assert(state._1.head.contains(to))
+      case If(cond, body)    =>
+        closedExprEval(cond, state)
+        assert(Checker.stmtIsClosed(body, keys)._1)
+      case Seq(stmt1, stmt2) =>
+        assert(Checker.stmtIsClosed(stmt1, keys)._1)
+        closedStmtEval1(stmt1, state)
+        Interpreter.evalStmt1(stmt1, state) match
+          case Left(_)     => () 
+          case Right(conf) => conf match
+            case St(nstate)          =>
+              assert(nstate._1.nonEmpty)
+              assert(nstate._1 != Nil())
+              assert(Checker.stmtIsClosed(stmt2, keySet(nstate._1.head))._1)
+            case Cmd(nstmt1, nstate) =>
+              assert(nstate._1.nonEmpty)
+              assert(nstate._1 != Nil())
+              assert(
+                Checker.stmtIsClosed(stmt1, keys)._2
+                  == Checker.stmtIsClosed(nstmt1, keySet(nstate._1.head))._2
+              )
+              assert(Checker.stmtIsClosed(Seq(nstmt1, stmt2), keySet(nstate._1.head))._1)
+      case _Block(stmt)       =>
+        assert(Checker.stmtIsClosed(stmt, keys)._1)
+        closedStmtEval1(stmt, state)
+        Interpreter.evalStmt1(stmt, state) match
+          case Left(_)     => ()
+          case Right(conf) => conf match
+            case St(nstate)         =>
+              assert(nstate._1.nonEmpty)
+              assert(nstate._1 != Nil())
+            case Cmd(nstmt, nstate) =>
+              assert(nstate._1.nonEmpty)
+              assert(nstate._1 != Nil())
+              assert(Checker.stmtIsClosed(_Block(nstmt), keySet(nstate._1.head))._1)
+  }.ensuring(
+    Interpreter.evalStmt1(stmt, state) match
+      case Right(conf) => conf match
+        case St(nstate) =>
+          nstate._1.nonEmpty
+          && (nstate._1 != Nil())
+        case Cmd(nstmt, nstate) =>
+          nstate._1.nonEmpty
+          && (nstate._1 != Nil())
+          && Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._1
+      case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
+  )
+
+  /*
   @extern
   def sub(stmt: Stmt, env1: Set[Name], env2: Set[Name]): Unit = {
     require(env1.subsetOf(env2))
@@ -163,6 +246,7 @@ object Proofs {
           //    .subsetOf(Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2)
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
+  */
 
   /*
   def test(seq: Stmt.Seq, state: State): Unit = {

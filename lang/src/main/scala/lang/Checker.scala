@@ -26,8 +26,23 @@ object Checker {
       val (s1, menv) = stmtIsClosed(stmt1, env)
       val (s2, nenv) = stmtIsClosed(stmt2, menv)
       (s1 && s2, nenv)
+    case _Block(stmt) =>
+      val (b, _) = stmtIsClosed(stmt, env)
+      (b, env)
   }
 
   def progIsClosed(prog: Stmt): (Boolean, Set[Name]) =
     stmtIsClosed(prog, Set.empty)
+
+  // ---
+
+  /*
+  def toplevelBlocks(stmt: Stmt, in: Boolean): Boolean = stmt match
+    case Decl(name, value) => true
+    case Assign(to, value) => true
+    case If(cond, body) => toplevelBlocks(body, true)
+    case Seq(stmt1, stmt2) => toplevelBlocks(stmt1, in) && toplevelBlocks(stmt1, true)
+    case _Block(stmt) => !in
+  */
+
 }
