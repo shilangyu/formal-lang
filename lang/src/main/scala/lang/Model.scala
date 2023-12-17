@@ -28,26 +28,26 @@ enum LangException:
 
 // ---
 
-import stainless.annotation.extern
+import stainless.annotation.{extern, pure}
 
-@extern
+@extern @pure
 def keySet[K, V](map: Map[K, V]): Set[K] = {
   Set.fromScala(map.theMap.keys.toSet)
 }
 
-@extern
+@extern @pure
 def keySetPost[K, V](map: Map[K, V], key: K): Unit = {
 }.ensuring( _ =>
   map.contains(key) == keySet(map).contains(key)
 )
 
-@extern
+@extern @pure
 def emptyKeySet[K, V](): Unit = {
 }.ensuring( _ =>
   Set.empty[K] == keySet(Map.empty[K, V])
 )
 
-@extern
+@extern @pure
 def consistentKeySet[K, V](set: Set[K], map: Map[K, V], key: K, value: V): Unit = {
   require(set == keySet(map))
 }.ensuring( _ =>
