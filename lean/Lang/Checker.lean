@@ -111,7 +111,9 @@ lemma typeCheckStmt_assignValue (h : isTypeCheckedStmt (Stmt.assign target value
   by_cases hn : (decide (target ∈ vars) && typeCheckExpr value vars)
   · simp [ite_false, hn] at h
     exact Bool.and_elim_right hn
-  · simp_all only [ite_false, Option.isSome_none]
+  · simp at h
+    have ⟨_, r⟩ := Option.isSome_if h
+    exact r
 
 /-- If Stmt.assign is type checked, then the name exists in the `vars` set. -/
 lemma typeCheckStmt_assign (h : isTypeCheckedStmt (Stmt.assign target value) vars) : target ∈ vars := by
@@ -138,7 +140,7 @@ lemma typeCheckStmt_conditionalBody (h : isTypeCheckedStmt (Stmt.conditional con
   · simp [Bool.false_and, hn] at h
 
 /-- Given that the type checker accepts the expression, we know that the expression is closed. -/
-@[simp] theorem typeCheckExpr_isClosedExpr (expr : Expr) (h : typeCheckExpr expr vars) : (isClosedExpr expr vars) := match expr with
+theorem typeCheckExpr_isClosedExpr (expr : Expr) (h : typeCheckExpr expr vars) : (isClosedExpr expr vars) := match expr with
   | Expr.true => by
       apply h
   | Expr.false => by
@@ -167,15 +169,9 @@ theorem typeCheckStmt_isClosedStmt (stmt : Stmt) (h : isTypeCheckedStmt stmt var
 
         by_cases hn : name ∉ vars
         · simp [ite_true, hn] at h
-          split
-          · exact Option.isSome_some
-          · case _ ht =>
-            simp [Option.isSome_none]
-            simp [Option.isSome_none] at ht
-            by_cases hp : typeCheckExpr value vars
-            · apply typeCheckExpr_isClosedExpr at hp
-              simp_all
-            · simp [*] at h
+          have cond := Option.isSome_if h
+          have condClosed := typeCheckExpr_isClosedExpr value cond
+          simp [*]
         · simp [ite_false, hn] at h
     | Stmt.assign target value => by
         unfold isTypeCheckedStmt at h
@@ -186,41 +182,26 @@ theorem typeCheckStmt_isClosedStmt (stmt : Stmt) (h : isTypeCheckedStmt stmt var
         by_cases hn : target ∉ vars
         · simp [*]
           simp [*] at h
-        · simp_all
-          split
-          · case _ ht => exact Option.isSome_some
-          · case _ ht =>
-            simp [Option.isSome_none]
-            simp [Option.isSome_none] at ht
-            split at h
-            · case _ hu =>
-              apply typeCheckExpr_isClosedExpr at hu
-              simp_all
-            · simp [*] at h
+        · simp at h
+          obtain ⟨l, r⟩ := Option.isSome_if h
+          have valueClosed := typeCheckExpr_isClosedExpr value r
+          simp [*]
     | Stmt.conditional condition body => by
         unfold isTypeCheckedStmt at h
         unfold typeCheckStmt at h
         unfold isClosedStmt
         unfold isClosedStmt.aux
 
-        split
-        · simp
-        · case _ ht =>
-          split at h
-          · case _ hu =>
-            rw [Bool.eq_false_eq_not_eq_true] at ht
-            have hul := by apply Bool.and_elim_left hu
-            have hur := by apply Bool.and_elim_right hu
-            clear hu h
+        simp at h
+        obtain ⟨cond, r⟩ := Option.isSome_if h
+        simp [*]
+        rw [← isTypeCheckedStmt] at r
+        clear h
+        have condClosed := typeCheckExpr_isClosedExpr condition cond
 
-            rw [Bool.and_eq_false_eq_eq_false_or_eq_false] at ht
-            simp_all
-            clear hul
-
-            apply typeCheckStmt_isClosedStmt at hur
-            rw [isClosedStmt] at hur
-            exact Option.isSome_isNone_contr hur ht
-          · exact h
+        apply typeCheckStmt_isClosedStmt at r
+        unfold isClosedStmt at r
+        simp [*]
 decreasing_by sorry -- TODO: no clue how to prove termination
 
 /-- Given that the type checker accepts the statement, we know there are no redeclared variables in the statement. -/
@@ -244,11 +225,10 @@ theorem typeCheckStmt_hasNoRedeclarations (stmt : Stmt) (h : isTypeCheckedStmt s
       unfold hasNoRedeclarations
       unfold hasNoRedeclarations.aux
 
-      split at h
-      · case _ ht =>
-        apply Bool.and_elim_right at ht
-        rw [← isTypeCheckedStmt] at ht
-        apply typeCheckStmt_hasNoRedeclarations
-        exact ht
-      · case _ ht =>
-        simp_all only [Bool.and_eq_true, not_and, Bool.not_eq_true, Option.not_isSome, Option.isSome_none]
+      simp at h
+      have ⟨l, r⟩ := Option.isSome_if h
+      have bodyNoRedecl := typeCheckStmt_hasNoRedeclarations body r
+      clear h r l
+
+      unfold hasNoRedeclarations at bodyNoRedecl
+      assumption
