@@ -27,7 +27,7 @@ inductive Stmt where
   | assign (target : Name) (value : Expr)
   | conditional (condition : Expr) (body : Stmt)
   -- | while (condition : Expr) (body : Stmt)
-  -- | block (statements : List Stmt)
+  | seq (left right : Stmt)
   -- | swap (left right : Expr)
   -- | bye (ref : Name)
 deriving Repr

@@ -48,7 +48,7 @@ def evalStmt (stmt : Stmt) (env : Env) (mem : Memory) (h : isTypeCheckedStmt stm
     let v := evalExpr value env mem (typeCheckStmt_declValue h)
     sorry -- TODO: store into memory
   | Stmt.assign target value =>
-    let loc := AList.get target env (typeCheckStmt_assign h)
+    let loc := AList.get target env (typeCheckStmt_targetExists h)
     sorry -- TODO: store into memory
   | Stmt.conditional condition body =>
     let cond := evalExpr condition env mem (typeCheckStmt_conditionalCond h)
@@ -56,5 +56,4 @@ def evalStmt (stmt : Stmt) (env : Env) (mem : Memory) (h : isTypeCheckedStmt stm
 
     -- we drop the new env, but keep the new mem
     (env, newMem)
-
--- def evalStmt (expr : Expr) (env : Env) (mem : Memory) (h : typeCheckExpr expr env) : Bool := match expr with
+  | Stmt.seq left right => sorry
