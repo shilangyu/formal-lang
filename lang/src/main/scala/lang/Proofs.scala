@@ -15,7 +15,7 @@ import Conf.*
 object Proofs {
 
   @extern 
-  def noBlocksProgToToplevelblocks(stmt: Stmt, state: State): Unit = {
+  def noBlocksStmtToToplevelblocks(stmt: Stmt, state: State): Unit = {
     require(state._1.nonEmpty)
     require(Checker.stmtHasNoBlocks(stmt))
   }.ensuring( _ =>
@@ -43,6 +43,7 @@ object Proofs {
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
 
+  /*
   @extern @pure
   def axiom2(stmt: Stmt, state: State, blocks: BigInt): Unit = {
     require(Interpreter.consistency(stmt, state, blocks))
@@ -59,79 +60,52 @@ object Proofs {
           (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
             == Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2)
   )
+  */
 
-  /*
   def evalStmt1Closeness(stmt: Stmt, state: State, blocks: BigInt): Unit = {
     require(Interpreter.consistency(stmt, state, blocks))
     val keys = keySet(state._1.head)
     require(Checker.stmtIsClosed(stmt, keys)._1)
+    closedStmtEval1(stmt, state, blocks)
     stmt match
       case Decl(name, value) =>
         consistentKeySet(keys, state._1.head, name, state._3)
       case Assign(to, value) => ()
-      case If(cond, body) =>
-        assert(
-          (Checker.stmtIsClosed(stmt, keys)._2
-            == Checker.stmtIsClosed(_Block(body), keySet((state._1.head :: state._1).head))._2)
-        )
-        assert(
-          Interpreter.evalStmt1(stmt, state, blocks) match
-            case Left(_) => true 
-            case Right(conf) => conf match
-              case St(nstate) =>
-                (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
-                  == keySet(nstate._1.head))
-              case Cmd(nstmt, nstate) =>
-                (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
-                  == Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2)
-        )
+      case If(cond, body) => ()
       case Seq(stmt1, stmt2) =>
-        assert(
-          Interpreter.evalStmt1(stmt, state, blocks) match
-            case Left(_) => true 
-            case Right(conf) => conf match
-              case St(nstate) =>
-                (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
-                  == keySet(nstate._1.head))
-              case Cmd(nstmt, nstate) =>
-                (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
-                  == Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2)
-        )
+        Interpreter.evalStmt1(stmt1, state, blocks) match
+          case Left(b) => () 
+          case Right(conf) => conf match
+            case St(nstate) => ()
+            case Cmd(nstmt1, nstate) =>
+              evalStmt1Closeness(Seq(nstmt1, stmt2), nstate, blocks)
       case _Block(stmt0) =>
-        evalStmt1Closeness(stmt0, state, blocks + 1)
         Interpreter.evalStmt1(stmt0, state, blocks + 1) match
           case Left(b) => () 
           case Right(conf) => conf match
-            case St(nstate) =>
-              assert(keys == keySet(nstate._1.tail.head))
-              assert(
-                Checker.stmtIsClosed(stmt, keys)._2
-                  == keySet(nstate._1.tail.head)
-              )
-            case Cmd(nstmt, nstate) =>
-              assert(
-                Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._1
-              )
+            case St(nstate) => ()
+            case Cmd(nstmt0, nstate) =>
+              evalStmt1Closeness(_Block(nstmt0), nstate, blocks)
   }.ensuring(
     Interpreter.evalStmt1(stmt, state, blocks) match
       case Left(_) => true 
       case Right(conf) => conf match
         case St(nstate) =>
+          Interpreter.consistency(nstate, blocks) &&
           (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
             == keySet(nstate._1.head))
-          && Interpreter.consistency(nstate, blocks)
         case Cmd(nstmt, nstate) =>
+          Interpreter.consistency(nstmt, nstate, blocks) &&
           (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
             == Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2)
-          && Interpreter.consistency(nstmt, nstate, blocks)
   )
-  */
 
   def closedStmtEval1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
     require(Interpreter.consistency(stmt, state, blocks))
     val keys = keySet(state._1.head)
     require(Checker.stmtIsClosed(stmt, keys)._1)
-    axiom2(stmt, state, blocks)  // REMOVE
+    //axiom2(stmt, state, blocks)  // REMOVE
+    evalStmt1Closeness(stmt, state, blocks)
     stmt match
       case Decl(name, value) =>
         closedExprEval(value, state)
@@ -455,25 +429,22 @@ object Proofs {
   )
   */
 
-  /*
   def closedStmtEval(stmt: Stmt, state: State): Unit = {
-    val keys = keySet(state._1)
+    require(Interpreter.consistency(stmt, state, 0))
+    val keys = keySet(state._1.head)
     require(Checker.stmtIsClosed(stmt, keys)._1)
-    closedStmtEval1(stmt, state)
-    Interpreter.evalStmt1(stmt, state) match
+    closedStmtEval1(stmt, state, 0)
+    Interpreter.evalStmt1(stmt, state, 0) match
       case Left(_) => ()
       case Right(conf) => conf match
-        case St(nstate) =>
-          assert(Checker.stmtIsClosed(stmt, keySet(state._1))._2 == keySet(nstate._1))
+        case St(nstate) => ()
         case Cmd(nstmt, nstate) =>
           closedStmtEval(nstmt, nstate)
   }.ensuring(
     Interpreter.evalStmt(stmt, state) match
-      case Right(fstate) =>
-        Checker.stmtIsClosed(stmt, keySet(state._1))._2 == keySet(fstate._1)
+      case Right(fstate) => true
       case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
   )
-  */
 
   /*
   def locIncreases(stmt: Stmt, state: State): Unit = {

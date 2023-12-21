@@ -113,4 +113,8 @@ object Interpreter {
         case St(fstate) => Right(fstate)
         case Cmd(nstmt, nstate) => evalStmt(nstmt, nstate)
 
+  //def evalProg(prog: Stmt): Option[Set[LangException]] =
+  //  require(consistency(prog, (List.empty, Map.empty, 1), 0))
+  //  evalStmt(prog, (List.empty, Map.empty, 1)).left.toOption
+
 }
