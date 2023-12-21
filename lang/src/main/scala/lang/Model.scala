@@ -53,3 +53,10 @@ def consistentKeySet[K, V](set: Set[K], map: Map[K, V], key: K, value: V): Unit 
 }.ensuring( _ =>
   set + key == keySet(map + (key -> value))
 )
+
+@pure
+def subsetTest[K, V](map: Map[K, V], key: K, value: V): Unit = {
+  consistentKeySet(keySet(map), map, key, value)
+}.ensuring( _ =>
+  keySet(map).subsetOf(keySet(map + (key -> value)))
+)
