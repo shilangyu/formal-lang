@@ -21,6 +21,8 @@ enum Conf:
 
 
 enum LangException:
+  case _EmptyEnvStack
+
   case UndeclaredVariable
   case RedeclaredVariable
   

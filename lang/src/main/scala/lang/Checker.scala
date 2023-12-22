@@ -7,6 +7,7 @@ import stainless.collection.*
 import Expr.*
 import Stmt.*
 
+
 object Checker {
 
   def exprIsClosed(expr: Expr, env: Set[Name]): Boolean = expr match {
