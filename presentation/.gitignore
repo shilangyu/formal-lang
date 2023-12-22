@@ -1,0 +1,28 @@
+# latex files
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+.*.lb
+*latexmk
+*.synctex.gz
+*.dvi
+*.nav
+*.snm
+*.vrb
+
+# bibtex
+*.bcf
+*.blg
+*.bbl
+*.run.xml
+
+# output pdf
+*.pdf
