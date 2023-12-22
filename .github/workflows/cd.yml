@@ -27,12 +27,19 @@ jobs:
           working_directory: paper-review
           root_file: main.tex
 
+      - name: Compile presentation
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: presentation
+          root_file: Main.tex
+
       - name: Create output directory
         run: |
           mkdir _build
           mv report/main.pdf _build/report.pdf
           mv paper-review/main.pdf _build/paper-review.pdf
-          echo '<ul><li><a href="./report.pdf">report</a></li><li><a href="./paper-review.pdf">paper review</a></li></ul>' > _build/index.html
+          mv presentation/Main.pdf _build/presentation.pdf
+          echo '<ul><li><a href="./report.pdf">report</a></li><li><a href="./paper-review.pdf">paper review</a></li><li><a href="./presentation.pdf">presentation</a></li></ul>' > _build/index.html
 
       - name: Deploy pdfs to Github Pages
         uses: JamesIves/github-pages-deploy-action@v4

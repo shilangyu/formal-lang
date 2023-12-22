@@ -13,19 +13,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # TODO: disabled for now as to not waste CI time
-      # - name: Compile report
-      #   uses: xu-cheng/latex-action@v3
-      #   with:
-      #     working_directory: report
-      #     root_file: main.tex
+      - name: Compile report
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: report
+          root_file: main.tex
 
-      # - name: Compile paper review
-      #   uses: xu-cheng/latex-action@v3
-      #   with:
-      #     working_directory: paper-review
-      #     root_file: main.tex
-      
+      - name: Compile paper review
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: paper-review
+          root_file: main.tex
+
+      - name: Compile presentation
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: presentation
+          root_file: Main.tex
+
       - name: Install Lean
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
