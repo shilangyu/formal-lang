@@ -3,6 +3,7 @@ package lang
 import stainless.*
 import stainless.lang.*
 import stainless.collection.*
+import stainless.annotation.*
 
 type Loc = BigInt
 
@@ -43,3 +44,33 @@ enum LangException:
   case InvalidLoc
   case SeqinSeq
   case EmptyEnvs
+
+@extern @pure
+def keysLength[K, V](map: Map[K, V]): Unit = {
+  //require(nstate._2)
+}//.ensuring(map1.keys.length == map2.keys.length)
+
+@extern @pure
+def keySet[K, V](map: Map[K, V]): Set[K] = {
+  //Set.fromScala(map.theMap.keys.toSet)
+  map.keys.toSet
+}
+
+@extern @pure
+def keySetPost[K, V](map: Map[K, V], key: K): Unit = {
+}.ensuring( _ =>
+  map.contains(key) == keySet(map).contains(key)
+)
+
+@extern @pure
+def emptyKeySet[K, V](): Unit = {
+}.ensuring( _ =>
+  Set.empty[K] == keySet(Map.empty[K, V])
+)
+
+@extern @pure
+def consistentKeySet[K, V](set: Set[K], map: Map[K, V], key: K, value: V): Unit = {
+  require(set == keySet(map))
+}.ensuring( _ =>
+  set + key == keySet(map + (key -> value))
+)

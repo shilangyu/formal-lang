@@ -26,27 +26,34 @@ object Checker {
       case Assign(to, value)    => 
         (env.head.contains(to) && isExprClosed(value, env.head), env)
       case If(cond, body)       =>
-        val (b, _) = isStmtClosed(body, env)
+        val (b, _) = isStmtClosed(body, env.push(env.head))
         (isExprClosed(cond, env.head) && b, env)
       case While(cond, body)   =>
-        val (b, _) = isStmtClosed(body, env)
+        val (b, _) = isStmtClosed(body, env.push(env.head))
         (isExprClosed(cond, env.head) && b, env)
       case Seq(stmt1, stmt2)    =>
         val (b1, env1) = isStmtClosed(stmt1, env)
         val (b2, env2) = isStmtClosed(stmt2, env1)
         (b1 && b2, env2)
+      case Block(stmt1)   => 
+        val (b, _) = isStmtClosed(stmt1, env) 
+        (b, env)
+        /*
       case Block(true, stmt1)    => 
         val (b, _) = isStmtClosed(stmt1, env.push(env.head)) 
         (b, env)
       case Block(false, stmt1)   => 
         val (b, _) = isStmtClosed(stmt1, env) 
         (b, env)
+        */
+
 
         /*
   def isProgClosed(prog: Stmt): (Boolean, EnvList) =
     isStmtClosed(prog, Map.empty[Name, Loc].asInstanceOf[Env])
   */
 
+ /*
   def noRedecl(stmt: Stmt, env: EnvList): (Boolean, EnvList) = stmt match {
     case Decl(name, value)    => 
       (!env.head.contains(name), env.tail.push(env.head + (name -> 0)))
@@ -68,5 +75,6 @@ object Checker {
       val (b, _) = noRedecl(stmt1, env) 
       (b, env)
   }
+      */
 
 }

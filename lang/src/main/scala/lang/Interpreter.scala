@@ -99,19 +99,19 @@ object Interpreter {
 
   def traceStmt1(stmt: Stmt, state: State): Either[Set[LangException], Conf] =
     //decreases(conf)
-      val (env, mem, nl) = state
+      val (env, mem, loc) = state
       stmt match
         case Decl(name, value)    => 
           (env.head.get(name), evalExpr(value, state)) match
           case (None(), Right(v))   =>
-            Right(St(env.tail.push(env.head + (name -> nl)), mem + (nl -> v), nl + 1))
+            Right(St(env.tail.push(env.head + (name -> loc)), mem + (loc -> v), loc + 1))
           case (None(), Left(b))    => Left(b)
           case (Some(_), Right(v))  => Left(Set(LangException.RedeclaredVariable)) 
           case (Some(_), Left(b))   => Left(b + LangException.RedeclaredVariable)
         case Assign(to, value)    => 
           (env.head.get(to), evalExpr(value, state)) match
-          case (Some(loc), Right(v))  => mem.get(loc) match
-            case Some(_) => Right(St(env, mem.updated(loc, v), nl))
+          case (Some(l), Right(v))  => mem.get(l) match
+            case Some(_) => Right(St(env, mem.updated(l, v), loc))
             case None()  => Left(Set(LangException.InvalidLoc))
           case (Some(loc), Left(b))   => mem.get(loc) match
             case Some(_) => Left(b)
@@ -121,18 +121,31 @@ object Interpreter {
         case If(cond, body)       => evalExpr(cond, state) match
           case Left(b)  => Left(b) 
           case Right(c) =>
-            if c then Right(Cmd(body, state))
+            if c then 
+              val statePush = (env.push(env.head), mem, loc)
+              Right(Cmd(Block(body), statePush))
             else Right(St(state))
         case While(cond, body)    => evalExpr(cond, state) match
           case Left(b)  => Left(b) 
           case Right(c) =>
-            if c then Right(Cmd(Seq(body, stmt), state))
+            if c then 
+              val statePush = (env.push(env.head), mem, loc)
+              Right(Cmd(Seq(Block(body), stmt), statePush))
             else Right(St(state))
         case Seq(stmt1, stmt2)          => traceStmt1(stmt1, state) match
           case Left(b)  => Left(b)
           case Right(c) => c match
-            case St(state1)         => Right(Cmd(stmt2, state1))
-            case Cmd(stmt1, state1) => Right(Cmd(Seq(stmt1, stmt2), state1)) 
+            case St(nstate)         => Right(Cmd(stmt2, nstate))
+            case Cmd(nstmt1, nstate) => Right(Cmd(Seq(nstmt1, stmt2), nstate)) 
+        case Block(stmt1)          => traceStmt1(stmt1, state) match
+          case Left(b)  => Left(b)
+          case Right(c) => c match
+            case St(nstate)         => 
+              val (nenv, nmem, nloc) = nstate
+              val nstatepop = (nenv.tail, nmem, nloc)
+              Right(St(nstatepop))
+            case Cmd(nstmt1, nstate) => Right(Cmd(Block(nstmt1), nstate)) 
+            /*
         case Block(true, stmt1)          => 
           val statePush = (env.push(env.head), mem, nl)     // entering the block
           traceStmt1(stmt1, statePush) match
@@ -151,5 +164,6 @@ object Interpreter {
               val state1pop = (env1.tail, mem1, nl1)
               Right(St(state1pop))
             case Cmd(stmt2, state1) => Right(Cmd(Block(false, stmt2), state1)) 
+            */
 
 }

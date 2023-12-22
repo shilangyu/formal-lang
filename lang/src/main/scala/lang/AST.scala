@@ -29,7 +29,7 @@ enum Stmt {
   case If(val cond: Expr, val body: Stmt.Block)
   case While(val cond: Expr, val body: Stmt.Block)
   case Seq(val stmt1: Stmt, val stmt2: Stmt)
-  case Block(val entering: Boolean, val stmt: Stmt)
+  case Block(val stmt: Stmt)
   //case Swap(val left: Expr, val right: Expr)
   //case Bye(val ref: Name)
 }
