@@ -188,65 +188,305 @@ object Proofs {
 
   // Rest
 
-  /*
-  def locIncreases(stmt: Stmt, state: State): Unit = {
-    decreases(stmt)
 
+  /* The next free location variable (state._3) can only increase in value. */
+  def locIncreases(stmt: Stmt, state: State, blocks: BigInt): Unit = {
+    decreases(stmt)
+    val env = state._1
     stmt match
-      case Decl(_, _)   =>
-        Interpreter.traceStmt1(Cmd(stmt, state)) match
+      case Decl(_, _)     =>
+        Interpreter.evalStmt1(stmt, state, blocks) match
           case Left(_)      => ()
           case Right(conf)  => conf match
-            case St(newState) =>
-              assert(newState._3 == state._3 + 1)
-            case _ => ()
-      case Seq(s1, _)   => 
-        locIncreases(s1, state)
-      case _            => ()
-
+            case St(nstate) =>
+              assert(nstate._3 == state._3 + 1)
+            case Cmd(_, _)  => ()
+      case Assign(_, _)   => ()
+      case If(_, _)       => () 
+      //case While(_, _)    => ()
+      case Seq(stmt1, _)  => 
+        locIncreases(stmt1, state, blocks)
+      case _Block(stmt1)   => 
+        locIncreases(stmt1, state, blocks + 1)
   }.ensuring(
-    Interpreter.traceStmt1(Cmd(stmt, state)) match
+    Interpreter.evalStmt1(stmt, state, blocks) match
       case Left(_) => true
       case Right(conf) => conf match
-        case St(newState) => newState._3 >= state._3
-/*
-          if stmt.isInstanceOf[Decl] then newState._3 == state._3 + 1
-          else newState._3 == state._3
-          */
-        case Cmd(_, newState) => newState._3 >= state._3
+        case St(nstate) => nstate._3 >= state._3
+        case Cmd(_, nstate) => nstate._3 >= state._3
     )
-  */
 
-  /*
-  def noDoubleLoc(stmt: Stmt, state: State): Unit = {
-    //require(Interpreter.traceStmt1(stmt, state).isRight) 
+  /* The next free location variable (state._3) can only 
+   * increase by one at every interpretation step. */
+  def locIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt): Unit = {
     decreases(stmt)
+    val env = state._1
     val mem = state._2
-    val freeLoc = state._3
-    require(!mem.contains(freeLoc))
-
-    locIncreases(stmt, state)
+    val loc = state._3
+    require(!mem.contains(loc))
     stmt match
-      case Decl(name, value)  =>
-        Interpreter.traceStmt1(Cmd(stmt, state)) match
-        //assert(newState._3 == freeLoc+1)
+      case Decl(_, _)     =>
+        Interpreter.evalStmt1(stmt, state, blocks) match
           case Left(_)      => ()
           case Right(conf)  => conf match
-            case St(newState) => 
-              assert(newState._2.contains(state._3))
-            case Cmd(_, newState) => ()
-      case Seq(s1, _)        => 
-        noDoubleLoc(s1, state)
-      case _ => ()
+            case St(nstate) =>
+              assert(nstate._3 == state._3 + 1)
+            case Cmd(_, _)  => ()
+      case Assign(_, _)   => ()
+      case If(_, _)       => () 
+      //case While(_, _)    => ()
+      case Seq(stmt1, _)  => 
+        locIncreasesByOne(stmt1, state, blocks)
+      case _Block(stmt1)   => 
+        locIncreasesByOne(stmt1, state, blocks + 1)
   }.ensuring(
-    Interpreter.traceStmt1(Cmd(stmt, state)) match
+    Interpreter.evalStmt1(stmt, state, blocks) match
       case Left(_) => true
       case Right(conf) => conf match
-        case St(newState) => 
-          newState._2 == state._2 || newState._2 - state._3 == state._2
-        case Cmd(_, newState) => 
-          newState._2 == state._2 || newState._2 - state._3 == state._2
+        case St(nstate) => 
+          nstate._3 == state._3 || nstate._3 == state._3 + 1
+        case Cmd(_, nstate) => 
+          nstate._3 == state._3 || nstate._3 == state._3 + 1
     )
-  */
+
+  /* Loc increses by one with a declaration */
+  def locIncreasesWithDecl(stmt: Stmt, state: State, blocks: BigInt): Unit = {
+    decreases(stmt)
+    val env = state._1
+    val mem = state._2
+    val loc = state._3
+    stmt match
+      case Decl(_, _)     =>
+        Interpreter.evalStmt1(stmt, state, blocks) match
+          case Left(_)      => ()
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              assert(nstate._3 == state._3 + 1)
+            case Cmd(_, _)  => ()
+      case Assign(_, _)   => ()
+      case If(_, _)       => () 
+      //case While(_, _)    => ()
+      case Seq(stmt1, _)  => 
+        locIncreasesWithDecl(stmt1, state, blocks)
+      case _Block(stmt1)   => 
+        locIncreasesWithDecl(stmt1, state, blocks + 1)
+  }.ensuring(
+    stmt match
+      case Decl(name, value) => 
+        Interpreter.evalStmt1(stmt, state, blocks) match
+          case Left(_)      => true
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              nstate._3 == state._3 + 1
+            case Cmd(_, nstate) =>
+              nstate._3 == state._3 + 1
+      case _ => true
+    )
+
+  /* If a list of envs is updated with a name and the next free loc,
+   * the top env contains name and name is mapped to the previous next 
+   * free loc */
+  def envListUpdated(state: State, x: Name): List[Env] = {
+    require(state._1.nonEmpty)
+    val nenv = (state._1.head + (x -> state._3))::state._1.tail
+    nenv
+  }.ensuring(r => (r.head contains x) && r.head(x) == state._3)
+
+  def envListEquality(env1: List[Env], env2: List[Env], x: Name, l: Loc): Unit = {
+    require(env1.nonEmpty && env2.nonEmpty)
+    require(env1.head == env2.head)
+    require(!(env1.head contains x))
+    require(!(env2.head contains x))
+  }.ensuring(env1.head == (env2.head + (x -> l)) - x)
+
+  /* Declarations always allocate using the next free location (state._3) */
+  def declUsesNextLoc(stmt: Stmt, state: State, blocks: BigInt): Unit = {
+    stmt match
+      case Decl(name, value)  => 
+        Interpreter.evalStmt1(stmt, state, blocks) match
+          case Left(_)      => ()
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              envListUpdated(state, name)
+              assert(nstate._1.head contains name)      // new var in previous loc
+              assert(nstate._1.head(name) == state._3)  // new var in previous loc
+            case Cmd(_, _) => ()
+      case Assign(_, _)       => ()
+      case If(_, _)           => () 
+      //case While(_, _)        => ()
+      case Seq(stmt1, _)      =>
+        declUsesNextLoc(stmt1, state, blocks)
+      case _Block(stmt1)       =>
+        declUsesNextLoc(stmt1, state, blocks + 1)
+  }.ensuring(
+    stmt match
+      case Decl(name, value) => 
+        Interpreter.evalStmt1(stmt, state, blocks) match
+          case Left(_)      => true
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              nstate._1.head(name) == state._3 // new var in previous loc
+            case Cmd(_, nstate) =>
+              nstate._1.head(name) == state._3
+      case _ => true
+    )
+
+  /* Next free location never in memory */
+  // TODO: Improve precodition: every loc greater than next loc is not in memory
+  def nextLocNeverInMemory(stmt: Stmt, state: State, blocks: BigInt, v: Boolean): Unit = {
+    require(!(state._2 contains state._3))
+    require(!(state._2 contains state._3 + 1))
+    require(!(state._2 contains state._3 + 2))
+    stmt match
+      case Decl(_, _)     =>
+        Interpreter.evalStmt1(stmt, state, blocks) match
+          case Left(_)      => ()
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              assert(!(nstate._2 contains nstate._3))  
+            case Cmd(_, _)  => ()
+      case Assign(_, _)   => ()
+      case If(_, _)       => () 
+      //case While(_, _)    => ()
+      case Seq(stmt1, _)  => 
+        nextLocNeverInMemory(stmt1, state, blocks, v)
+      case _Block(stmt1)   => 
+        nextLocNeverInMemory(stmt1, state, blocks + 1, v)
+  }.ensuring(
+    Interpreter.evalStmt1(stmt, state, blocks) match
+      case Left(_) => true
+      case Right(conf) => conf match
+        case St(nstate) => 
+          !(nstate._2 contains nstate._3)
+        case Cmd(_, nstate) => 
+          !(nstate._2 contains nstate._3)
+    )
+
+  /* If map contains x, if x is updated in the map the number of keys preserved */
+  @extern @pure
+  def mapsUpdate(map: Mem, x: Loc, y: Boolean): Unit = {
+    require(map.contains(x))
+  }.ensuring(_ => map.updated(x, y).keys == map.keys)
+
+  /* Two equal maps have the same number of keys */
+  def equalKeyCardinality[K, V](map1: Map[K, V], map2: Map[K, V]): Unit = {
+    require(map1 == map2)
+  }.ensuring(map1.keys.length == map2.keys.length)
+
+  /* If map1 is equal to map2 - k, then map2 has one key more than map1 */
+  @extern @pure
+  def equalKeyCardinalityIncrement[K, V](map1: Map[K, V], map2: Map[K, V], k: K): Unit = {
+    require(map1 == map2 - k)
+    require(map2 contains k)
+  }.ensuring(map1.keys.length + 1 == map2.keys.length)
+
+  /* If map1 is equal to map2 and map2 is updated with a new key,
+   * then the updated map2 has one key more than map1 */
+  @extern @pure
+  def greaterKeyCardinality[K, V](map1: Map[K, V], map2: Map[K, V], k: K, v: V): Unit = {
+    require(map1 == map2)
+    require(!(map2 contains k))
+    require(!(map1 contains k))
+    equalKeyCardinality(map1, map2)
+  }.ensuring(map1.keys.length + 1 == (map2 + (k -> v)).keys.length)
+
+  /* If map1 and map2 have the same length and contain k, 
+   * if k is updated in map2 then the number of keys is preserved */
+  @extern @pure
+  def equalKeyCardUpdateCommonKey[K, V](map1: Map[K, V], map2: Map[K, V], k: K, v: V): Unit = {
+    //require(map1 == map2)
+    require(map1.keys.length == map2.keys.length)
+    require(map1 contains k)
+    require(map2 contains k)
+  }.ensuring(map1.keys.length == (map2 + (k -> v)).keys.length)
+
+  /* If map1 and map2 have the same length and do not contain k, 
+   * if k is added in both maps then the number of keys is still equal */
+  @extern @pure
+  def equalKeyCardPreserved[K, V](map1: Map[K, V], map2: Map[K, V], k: K, v1: V, v2: V): Unit = {
+    require(map1.keys.length == map2.keys.length)
+    require(!(map1 contains k))
+    require(!(map2 contains k))
+  }.ensuring((map1 + (k -> v1)).keys.length == (map2 + (k -> v2)).keys.length)
+
+  /* At every interpretation step, memory can only increase by one. */
+  def memIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt, v: Boolean): Unit = {
+    val env = state._1
+    val mem = state._2
+    val loc = state._3
+    require(!(mem contains loc))
+    stmt match
+      case Decl(name, _)   =>
+        Interpreter.evalStmt1(stmt, state, blocks) match
+          case Left(_)      => ()
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              assert(nstate._2 - (loc) == state._2)    // VALID
+              equalKeyCardinalityIncrement(state._2, nstate._2, loc)
+              assert(state._2.keys.length + 1 == nstate._2.keys.length)
+            case Cmd(_, nstate) => 
+              assert(nstate._2 == state._2)
+              equalKeyCardinality(state._2, nstate._2)
+              assert(state._2.keys.length == nstate._2.keys.length)
+      case Assign(to, _) =>
+        Interpreter.evalStmt1(stmt, state, blocks) match
+          case Left(_)      => ()
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              val toLoc = state._1.head(to)
+              equalKeyCardPreserved(
+                state._2 - toLoc, 
+                nstate._2 - toLoc, 
+                toLoc, 
+                state._2(toLoc),
+                nstate._2(toLoc))
+              assert(nstate._2 - toLoc == state._2 - toLoc)
+              equalKeyCardUpdateCommonKey(state._2, state._2, toLoc, v)
+              assert(state._2.keys.length == nstate._2.keys.length)
+            case Cmd(_, nstate) => 
+              assert(nstate._2 == state._2)
+              equalKeyCardinality(state._2, nstate._2)
+              assert(state._2.keys.length == nstate._2.keys.length)
+      case If(_, _) =>
+        Interpreter.evalStmt1(stmt, state, blocks) match
+          case Left(_)      => ()
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              assert(nstate._2 == state._2)
+              equalKeyCardinality(state._2, nstate._2)
+              assert(state._2.keys.length == nstate._2.keys.length)
+            case Cmd(_, nstate) => 
+              assert(nstate._2 == state._2)
+              equalKeyCardinality(state._2, nstate._2)
+              assert(state._2.keys.length == nstate._2.keys.length)
+              /*
+      case While(_, _) =>
+        Interpreter.traceStmt1(stmt, state) match
+          case Left(_)      => ()
+          case Right(conf)  => conf match
+            case St(nstate) =>
+              assert(nstate._2 == state._2)
+              equalKeyCardinality(state._2, nstate._2)
+              assert(state._2.keys.length == nstate._2.keys.length)
+            case Cmd(_, nstate) => 
+              assert(nstate._2 == state._2)
+              equalKeyCardinality(state._2, nstate._2)
+              assert(state._2.keys.length == nstate._2.keys.length)
+              */
+      case Seq(stmt1, _)   => 
+        memIncreasesByOne(stmt1, state, blocks, v)
+      case _Block(stmt1)   => 
+        memIncreasesByOne(stmt1, state, blocks + 1,  v)
+  }.ensuring(
+    Interpreter.evalStmt1(stmt, state, blocks) match 
+      case Left(_) => true
+      case Right(conf) => conf match
+        case St(nstate) => 
+          nstate._2.keys.length == state._2.keys.length ||
+          nstate._2.keys.length == state._2.keys.length + 1
+        case Cmd(_, nstate) => 
+          nstate._2.keys.length == state._2.keys.length ||
+          nstate._2.keys.length == state._2.keys.length + 1
+    )
 
 }
