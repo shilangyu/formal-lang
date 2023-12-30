@@ -14,12 +14,6 @@ inductive Expr where
   | false
   | nand (left right : Expr)
   | ident (name : Name)
-  -- | ref (of : Expr)
-  -- | deref (of : Expr)
-  -- TODO: introduce structs
-  -- | struct (fields : List struct_field)
-  -- | struct_field (name : String) (value: Expr)
-  -- | field (of: Expr) (name: String)
 deriving Repr
 
 inductive Stmt where
@@ -28,6 +22,5 @@ inductive Stmt where
   | conditional (condition : Expr) (body : Stmt)
   -- | while (condition : Expr) (body : Stmt)
   | seq (left right : Stmt)
-  -- | swap (left right : Expr)
   -- | bye (ref : Name)
 deriving Repr

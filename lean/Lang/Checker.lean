@@ -145,6 +145,24 @@ lemma typeCheckStmt_conditionalBody (h : isTypeCheckedStmt (Stmt.conditional con
   · exact Bool.and_elim_right hn
   · simp only [hn, ite_false, Option.isSome_none] at h
 
+/-- If Stmt.seq is type checked, then the left side is type checked too. -/
+lemma typeCheckStmt_seqLeft (h : isTypeCheckedStmt (Stmt.seq left right) vars) : isTypeCheckedStmt left vars := by
+  rw [isTypeCheckedStmt] at h
+  unfold typeCheckStmt at h
+  split at h
+  · case _ hn =>
+    simp only [isTypeCheckedStmt, hn, Option.isSome_some, ite_true]
+  · simp only [Option.isSome_none] at h
+
+/-- If Stmt.seq is type checked, then the right side is type checked too. -/
+lemma typeCheckStmt_seqRight (h : isTypeCheckedStmt (Stmt.seq left right) vars) : isTypeCheckedStmt left vars := by
+  rw [isTypeCheckedStmt] at h
+  unfold typeCheckStmt at h
+  split at h
+  · case _ hn =>
+    simp only [isTypeCheckedStmt, hn, Option.isSome_some, ite_true]
+  · simp only [Option.isSome_none] at h
+
 /-- Given that the type checker accepts the expression, we know that the expression is closed. -/
 theorem typeCheckExpr_isClosedExpr (h : typeCheckExpr expr vars) : (isClosedExpr expr vars) := match expr with
   | Expr.true => by

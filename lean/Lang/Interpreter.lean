@@ -56,4 +56,6 @@ def evalStmt (stmt : Stmt) (env : Env) (mem : Memory) (h : isTypeCheckedStmt stm
 
     -- we drop the new env, but keep the new mem
     (env, newMem)
-  | Stmt.seq left right => sorry
+  | Stmt.seq left right =>
+    let (newEnv, newMem) := evalStmt left env mem (typeCheckStmt_seqLeft h)
+    sorry
