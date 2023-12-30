@@ -1,7 +1,7 @@
 import Lang.Ast
 import Mathlib.Data.List.AList
-import Mathlib.Data.Finset.Basic
 import Lang.Checker
+import Lang.Helpers
 
 /-!
 # Interpreter
@@ -19,20 +19,6 @@ deriving Repr, DecidableEq
 abbrev Env := @AList Name (fun _ => Loc)
 /-- The memory maps variable locations to values. -/
 abbrev Memory := @AList Loc (fun _ => Bool)
-
-instance [Repr α] [∀ a, Repr (β a)] : ToString (@AList α β) where
-  toString l := "{" ++ (l.entries |> List.map (fun e => s!"{reprStr e.fst}: {reprStr e.snd}") |> String.intercalate ", ") ++ "}"
-
-/-- Returns a finite set of keys of an association list. -/
-def keySet {α : Type} {β : α → Type} (a : @AList α β) : Finset α :=
-  Finset.mk (Multiset.ofList a.keys) a.nodupKeys
-
-/-- Given a proof that key ∈ assocList, lookups the key without fail. -/
-def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ assocList) : β key :=
-  have isSome : (assocList.lookup key).isSome := by exact AList.lookup_isSome.mpr h
-
-  match assocList.lookup key, isSome with
-    | some v, _ => v
 
 /-- Evaluates an expression given a proof that the type checker has accepted this input. -/
 def evalExpr (expr : Expr) (env : Env) (mem : Memory) (h : typeCheckExpr expr (keySet env)) : Bool := match expr with

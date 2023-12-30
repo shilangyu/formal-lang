@@ -1,11 +1,29 @@
 import Mathlib.Tactic
-
+import Mathlib.Data.List.AList
+import Mathlib.Data.Finset.Basic
 
 /-!
 # Helpers
 
 This module stores helper lemmas, functions, utils, etc.
 -/
+
+/-! ## Functions -/
+
+instance AListToString [Repr α] [∀ a, Repr (β a)] : ToString (@AList α β) where
+  toString l := "{" ++ (l.entries |> List.map (fun e => s!"{reprStr e.fst}: {reprStr e.snd}") |> String.intercalate ", ") ++ "}"
+
+/-- Returns a finite set of keys of an association list. -/
+def keySet {α : Type} {β : α → Type} (a : @AList α β) : Finset α :=
+  Finset.mk (Multiset.ofList a.keys) a.nodupKeys
+
+/-- Given a proof that key ∈ assocList, lookups the key without fail. -/
+def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ assocList) : β key :=
+  have isSome : (assocList.lookup key).isSome := by exact AList.lookup_isSome.mpr h
+
+  match assocList.lookup key, isSome with
+    | some v, _ => v
+
 
 /-! ## Lemmas -/
 
