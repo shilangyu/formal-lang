@@ -44,4 +44,6 @@ def evalStmt (stmt : Stmt) (env : Env) (mem : Memory) (h : isTypeCheckedStmt stm
     (env, newMem)
   | Stmt.seq left right =>
     let (newEnv, newMem) := evalStmt left env mem (typeCheckStmt_seqLeft h)
-    sorry
+    evalStmt right newEnv newMem (by sorry)
+
+lemma evalStmt_env_eq_typeCheck (h : isTypeCheckedStmt stmt (keySet env)) : typeCheckStmt stmt (keySet env) = some (keySet (evalStmt stmt env mem h).1) := by sorry
