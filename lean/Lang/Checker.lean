@@ -20,8 +20,6 @@ def typeCheckExpr (expr : Expr) (vars : Variables) : Bool := match expr with
   | Expr.false => Bool.true
   | Expr.nand left right => (typeCheckExpr left vars) && (typeCheckExpr right vars)
   | Expr.ident name => name ∈ vars
-  -- | Expr.ref of => Bool.true
-  -- | Expr.deref of => Bool.true
 
 def typeCheckStmt (stmt : Stmt) (vars : Variables) : Option Variables := match stmt with
   | Stmt.decl name value =>
@@ -155,12 +153,17 @@ lemma typeCheckStmt_seqLeft (h : isTypeCheckedStmt (Stmt.seq left right) vars) :
   · simp only [Option.isSome_none] at h
 
 /-- If Stmt.seq is type checked, then the right side is type checked too. -/
-lemma typeCheckStmt_seqRight (h : isTypeCheckedStmt (Stmt.seq left right) vars) : isTypeCheckedStmt left vars := by
+lemma typeCheckStmt_seqRight (h : isTypeCheckedStmt (Stmt.seq left right) vars) (eq : typeCheckStmt left vars = some newEnv) : isTypeCheckedStmt right newEnv := by
   rw [isTypeCheckedStmt] at h
   unfold typeCheckStmt at h
   split at h
-  · case _ hn =>
-    simp only [isTypeCheckedStmt, hn, Option.isSome_some, ite_true]
+  · case _ varst hn =>
+    have ht : newEnv = varst := by
+      simp only [eq, Option.some.injEq] at hn
+      assumption
+    rw [isTypeCheckedStmt]
+    subst ht
+    assumption
   · simp only [Option.isSome_none] at h
 
 /-- Given that the type checker accepts the expression, we know that the expression is closed. -/
