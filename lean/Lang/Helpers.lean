@@ -58,3 +58,6 @@ def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ as
     split
     · apply Option.some_eq_some.mpr h.2.symm
     · simp [*] at h
+
+@[simp] lemma Option.isNone_false_isSome : Option.isNone o = false ↔ Option.isSome o := by
+  cases o <;> simp only [isNone_none, isSome_none, isNone_some, isSome_some]
