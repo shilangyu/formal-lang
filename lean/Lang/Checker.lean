@@ -32,6 +32,7 @@ def typeCheckStmt (stmt : Stmt) (vars : Variables) : Option Variables := match s
     else none
   | Stmt.assign target value => if target ∈ vars && typeCheckExpr value vars then some vars else none
   | Stmt.conditional condition body => if typeCheckExpr condition vars && (typeCheckStmt body vars).isSome then some vars else none
+  | Stmt.while condition body => if typeCheckExpr condition vars && (typeCheckStmt body vars).isSome then some vars else none
   | Stmt.seq left right => match typeCheckStmt left vars with
     | some vars => typeCheckStmt right vars
     | none => none
@@ -59,6 +60,7 @@ where
           none
     | Stmt.assign target value => if target ∈ vars && isClosedExpr value vars then some vars else none
     | Stmt.conditional condition body => if isClosedExpr condition vars && (aux body vars).isSome then some vars else none
+    | Stmt.while condition body => if isClosedExpr condition vars && (aux body vars).isSome then some vars else none
     | Stmt.seq left right => match aux left vars with
       | some vars => aux right vars
       | none => none
@@ -74,6 +76,7 @@ where
           none
     | Stmt.assign _ _ => some vars
     | Stmt.conditional _ body => if (aux body vars).isSome then some vars else none
+    | Stmt.while _ body => if (aux body vars).isSome then some vars else none
     | Stmt.seq left right => match aux left vars with
       | some vars => aux right vars
       | none => none
@@ -137,6 +140,22 @@ lemma typeCheckStmt_conditionalCond (h : isTypeCheckedStmt (Stmt.conditional con
 
 /-- If Stmt.conditional is type checked, then the body is type checked too. -/
 lemma typeCheckStmt_conditionalBody (h : isTypeCheckedStmt (Stmt.conditional condition body) vars) : isTypeCheckedStmt body vars := by
+  rw [isTypeCheckedStmt] at h
+  unfold typeCheckStmt at h
+  by_cases hn : typeCheckExpr condition vars && Option.isSome (typeCheckStmt body vars)
+  · exact Bool.and_elim_right hn
+  · simp only [hn, ite_false, Option.isSome_none] at h
+
+/-- If Stmt.while is type checked, then the condition is type checked too. -/
+lemma typeCheckStmt_whileCond (h : isTypeCheckedStmt (Stmt.while condition body) vars) : typeCheckExpr condition vars := by
+  rw [isTypeCheckedStmt] at h
+  unfold typeCheckStmt at h
+  by_cases hn : typeCheckExpr condition vars && Option.isSome (typeCheckStmt body vars)
+  · exact Bool.and_elim_left hn
+  · simp only [hn, ite_false, Option.isSome_none] at h
+
+/-- If Stmt.while is type checked, then the body is type checked too. -/
+lemma typeCheckStmt_whileBody (h : isTypeCheckedStmt (Stmt.while condition body) vars) : isTypeCheckedStmt body vars := by
   rw [isTypeCheckedStmt] at h
   unfold typeCheckStmt at h
   by_cases hn : typeCheckExpr condition vars && Option.isSome (typeCheckStmt body vars)
@@ -214,7 +233,7 @@ lemma typeCheckStmt_vars_eq_isClosedStmt (h : isTypeCheckedStmt stmt vars) : typ
       rw [Option.eqSome_if]
       simp only [and_true]
       apply typeCheckExpr_isClosedExpr h.2
-  | Stmt.conditional condition body => by
+  | Stmt.conditional condition body | Stmt.while condition body => by
       unfold isTypeCheckedStmt at h
       unfold typeCheckStmt at h
       unfold typeCheckStmt
@@ -278,7 +297,7 @@ theorem typeCheckStmt_vars_eq_hasNoRedeclarations (h : isTypeCheckedStmt stmt va
       simp only [Bool.and_eq_true, decide_eq_true_eq, Option.isSome_if] at h
       simp only [Bool.and_eq_true, decide_eq_true_eq, ite_eq_left_iff, not_and, Bool.not_eq_true, imp_false, not_forall, Bool.not_eq_false, exists_prop]
       assumption
-    | Stmt.conditional _ body => by
+    | Stmt.conditional _ body | Stmt.while _ body => by
       unfold isTypeCheckedStmt at h
       unfold typeCheckStmt at h
       unfold typeCheckStmt
