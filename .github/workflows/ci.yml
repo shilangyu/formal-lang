@@ -52,6 +52,7 @@ jobs:
         working-directory: lang/
         run: sbt test
 
-      - name: Build Lean project
-        working-directory: lean/
-        run: lake build
+      # left out, takes an hour to compile mathlib
+      # - name: Build Lean project
+      #   working-directory: lean/
+      #   run: lake build

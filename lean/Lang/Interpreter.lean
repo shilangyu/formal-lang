@@ -58,6 +58,20 @@ def evalStmt (stmt : Stmt) (env : Env) (mem : Memory) (h : isTypeCheckedStmt stm
         simp only [typeCheckStmt, typeCheckStmt_conditionalCond h, Bool.true_and, ite_eq_left_iff, Bool.not_eq_true, Option.not_isSome, imp_false, Option.isNone_false_isSome]
         exact typeCheckStmt_conditionalBody h
       )
+  | Stmt.while condition body => Id.run do
+    let mut env' := env
+    let mut mem' := mem
+    let mut h' := h
+
+    while evalExpr condition env' mem' (typeCheckStmt_whileCond h') do
+      let res := evalStmt body env' mem' (typeCheckStmt_whileBody h')
+      mem' := res.newMem
+
+    EvalResult.mk env mem' (by
+      simp only [typeCheckStmt, typeCheckStmt_whileCond h, Bool.true_and, ite_eq_left_iff,
+        Bool.not_eq_true, Option.not_isSome, imp_false, Option.isNone_false_isSome]
+      exact typeCheckStmt_whileBody h
+    )
   | Stmt.seq left right =>
     let new := evalStmt left env mem (typeCheckStmt_seqLeft h)
     let newer := evalStmt right new.newEnv new.newMem (typeCheckStmt_seqRight h new.sameEnv)
