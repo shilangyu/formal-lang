@@ -1,26 +1,26 @@
-structure Ident where
+/-!
+# AST
+
+This module defines the abstract syntax tree of the language.
+-/
+
+/-- A newtype for a string representing an identifier. -/
+structure Name where
   name : String
-deriving Repr
+deriving Repr, DecidableEq
 
 inductive Expr where
   | true
   | false
   | nand (left right : Expr)
-  | ident : Ident → Expr
-  | ref (of : Expr)
-  | deref (of : Expr)
-  -- TODO: introduce structs
-  -- | struct (fields : List struct_field)
-  -- | struct_field (name : String) (value: Expr)
-  -- | field (of: Expr) (name: String)
+  | ident (name : Name)
 deriving Repr
 
 inductive Stmt where
-  | decl (name : String) (value : Expr)
-  | assign (to : Expr) (value : Expr)
-  | if (condition : Expr) (body : Stmt)
-  | while (condition : Expr) (body : Stmt)
-  | block (statements : List Stmt)
-  | swap (left right : Expr)
-  | bye (ref : Ident)
+  | decl (name : Name) (value : Expr)
+  | assign (target : Name) (value : Expr)
+  | conditional (condition : Expr) (body : Stmt)
+  -- | while (condition : Expr) (body : Stmt)
+  | seq (left right : Stmt)
+  -- | bye (ref : Name)
 deriving Repr
