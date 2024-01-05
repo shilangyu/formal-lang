@@ -28,6 +28,9 @@ object Proofs {
       case If(cond, body) =>
         val (b, i) = blocksAreToplevel(body)
         (b && i == 0, i)
+      case While(cond, body) =>
+        val (b, i) = blocksAreToplevel(body)
+        (b && i == 0, i)
       case Seq(stmt1, stmt2) =>
         val (b1, i1) = blocksAreToplevel(stmt1)
         val (b2, i2) = blocksAreToplevel(stmt2)
@@ -107,6 +110,7 @@ object Proofs {
         consistentKeySet(keys, state._1.head, name, state._3)
       case Assign(to, value) => ()
       case If(cond, body) => ()
+      case While(cond, body) => ()
       case Seq(stmt1, stmt2) =>
         Interpreter.evalStmt1(stmt1, state, blocks) match
           case Left(b) => () 
@@ -148,6 +152,8 @@ object Proofs {
         closedExprEval(value, state)
         keySetPost(state._1.head, to)
       case If(cond, body)    =>
+        closedExprEval(cond, state)
+      case While(cond, body)    =>
         closedExprEval(cond, state)
       case Seq(stmt1, stmt2) =>
         closedStmtEvalPlusClosedness1(stmt1, state, blocks)
@@ -203,7 +209,7 @@ object Proofs {
             case Cmd(_, _)  => ()
       case Assign(_, _)   => ()
       case If(_, _)       => () 
-      //case While(_, _)    => ()
+      case While(_, _)    => ()
       case Seq(stmt1, _)  => 
         locIncreases(stmt1, state, blocks)
       case _Block(stmt1)   => 
@@ -234,7 +240,7 @@ object Proofs {
             case Cmd(_, _)  => ()
       case Assign(_, _)   => ()
       case If(_, _)       => () 
-      //case While(_, _)    => ()
+      case While(_, _)    => ()
       case Seq(stmt1, _)  => 
         locIncreasesByOne(stmt1, state, blocks)
       case _Block(stmt1)   => 
@@ -265,7 +271,7 @@ object Proofs {
             case Cmd(_, _)  => ()
       case Assign(_, _)   => ()
       case If(_, _)       => () 
-      //case While(_, _)    => ()
+      case While(_, _)    => ()
       case Seq(stmt1, _)  => 
         locIncreasesWithDecl(stmt1, state, blocks)
       case _Block(stmt1)   => 
@@ -313,7 +319,7 @@ object Proofs {
             case Cmd(_, _) => ()
       case Assign(_, _)       => ()
       case If(_, _)           => () 
-      //case While(_, _)        => ()
+      case While(_, _)        => ()
       case Seq(stmt1, _)      =>
         declUsesNextLoc(stmt1, state, blocks)
       case _Block(stmt1)       =>
@@ -347,7 +353,7 @@ object Proofs {
             case Cmd(_, _)  => ()
       case Assign(_, _)   => ()
       case If(_, _)       => () 
-      //case While(_, _)    => ()
+      case While(_, _)    => ()
       case Seq(stmt1, _)  => 
         nextLocNeverInMemory(stmt1, state, blocks, v)
       case _Block(stmt1)   => 
@@ -459,9 +465,8 @@ object Proofs {
               assert(nstate._2 == state._2)
               equalKeyCardinality(state._2, nstate._2)
               assert(state._2.keys.length == nstate._2.keys.length)
-              /*
       case While(_, _) =>
-        Interpreter.traceStmt1(stmt, state) match
+        Interpreter.evalStmt1(stmt, state, blocks) match
           case Left(_)      => ()
           case Right(conf)  => conf match
             case St(nstate) =>
@@ -472,7 +477,6 @@ object Proofs {
               assert(nstate._2 == state._2)
               equalKeyCardinality(state._2, nstate._2)
               assert(state._2.keys.length == nstate._2.keys.length)
-              */
       case Seq(stmt1, _)   => 
         memIncreasesByOne(stmt1, state, blocks, v)
       case _Block(stmt1)   => 
