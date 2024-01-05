@@ -63,6 +63,13 @@ object Interpreter {
             if env.isEmpty then Left(Set(LangException._EmptyEnvStack))
             else Right(Cmd(_Block(body), (env.head :: env, mem, nl)))
           else Right(St(state))
+      case While(cond, body)    => evalExpr(cond, state) match
+        case Left(b)  => Left(b)
+        case Right(c) => 
+          if c then
+            if env.isEmpty then Left(Set(LangException._EmptyEnvStack))
+            else Right(Cmd(Seq(_Block(body), stmt), (env.head :: env, mem, nl)))
+          else Right(St(state))
       case Seq(stmt1, stmt2)  => evalStmt1(stmt1, state, blocks) match
         case Left(b)  => Left(b)
         case Right(conf) => conf match

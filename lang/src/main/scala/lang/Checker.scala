@@ -23,6 +23,9 @@ object Checker {
     case If(cond, body)    =>
       val (b, _) = stmtIsClosed(body, env)
       (exprIsClosed(cond, env) && b, env)
+    case While(cond, body)   =>
+      val (b, _) = stmtIsClosed(body, env)
+      (exprIsClosed(cond, env) && b, env)
     case Seq(stmt1, stmt2) =>
       val (s1, menv) = stmtIsClosed(stmt1, env)
       val (s2, nenv) = stmtIsClosed(stmt2, menv)
@@ -41,6 +44,7 @@ object Checker {
     case Decl(name, value) => true
     case Assign(to, value) => true
     case If(cond, body) => stmtHasNoBlocks(body)
+    case While(cond, body) => stmtHasNoBlocks(body)
     case Seq(stmt1, stmt2) => stmtHasNoBlocks(stmt1) && stmtHasNoBlocks(stmt2)
     case _Block(stmt0) => false
 
