@@ -37,21 +37,21 @@ object Checker {
   def progIsClosed(prog: Stmt): (Boolean, Set[Name]) =
     stmtIsClosed(prog, Set.empty)
 
-  def stmtHasNoRedeclarations(stmt: Stmt, env: Set[Name]): Option[Set[Name]] =
+  def stmtHasNoRedeclarations(stmt: Stmt, env: Set[Name]): (Boolean, Set[Name]) =
     stmt match {
-      case Decl(name, value) =>
-        if env.contains(name) then None() else Some(env + name)
-      case Assign(to, value) => Some(env)
-      case If(cond, body)    => stmtHasNoRedeclarations(body, env)
+      case Decl(name, value) => (!env.contains(name), env + name)
+      case Assign(to, value) => (true, env)
+      case If(cond, body)    =>
+        val (b, _) = stmtHasNoRedeclarations(body, env)
+        (b, env)
       case Seq(stmt1, stmt2) =>
-        stmtHasNoRedeclarations(stmt1, env) match
-          case Some(nenv) => stmtHasNoRedeclarations(stmt2, nenv)
-          case None()     => None()
-      case _Block(stmt0)     => stmtHasNoRedeclarations(stmt0, env)
+        val (s1, menv) = stmtHasNoRedeclarations(stmt1, env)
+        val (s2, nenv) = stmtHasNoRedeclarations(stmt2, menv)
+        (s1 && s2, nenv)
+      case _Block(stmt0)     =>
+        val (b, _) = stmtHasNoRedeclarations(stmt0, env)
+        (b, env)
     }
-
-  def progHasNoRedeclarations(prog: Stmt): Boolean =
-    stmtHasNoRedeclarations(prog, Set.empty).isDefined
 
   // ---
 

@@ -96,12 +96,31 @@ object Proofs {
         && !exceptions.contains(LangException._EmptyEnvStack)
   )
 
+  def hasNoRedeclarationsExprEval(expr: Expr, state: State): Unit = {
+    require(state._1.nonEmpty)
+    val keys = keySet(state._1.head)
+    expr match
+      case True => ()
+      case False => ()
+      case Ident(name) => ()
+      case Nand(left, right) =>
+        hasNoRedeclarationsExprEval(left, state)
+        hasNoRedeclarationsExprEval(right, state)
+  }.ensuring(
+    Interpreter.evalExpr(expr, state) match
+      case Right(_) => true
+      case Left(exceptions) =>
+        !exceptions.contains(LangException.RedeclaredVariable)
+        && !exceptions.contains(LangException._EmptyEnvStack)
+  )
+
   def evalStmt1Aux(stmt: Stmt, state: State, blocks: BigInt): Unit = {
     require(stmtAndStateAreConsistent(stmt, state, blocks))
     val keys = keySet(state._1.head)
     require(Checker.stmtIsClosed(stmt, keys)._1)
+    require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
     evalStmt1Consistency(stmt, state, blocks)
-    closedStmtEvalPlusClosedness1(stmt, state, blocks)
+    stmtEvalClosedAndHasNoRedeclarationsPreservation1(stmt, state, blocks)
     stmt match
       case Decl(name, value) =>
         consistentKeySet(keys, state._1.head, name, state._3)
@@ -128,31 +147,39 @@ object Proofs {
         case St(nstate) =>
           stateIsConsistent(nstate, blocks) &&
           (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
+            == keySet(nstate._1.head)) &&
+          (Checker.stmtHasNoRedeclarations(stmt, keySet(state._1.head))._2
             == keySet(nstate._1.head))
         case Cmd(nstmt, nstate) =>
           stmtAndStateAreConsistent(nstmt, nstate, blocks) &&
           (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
-            == Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2)
+            == Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2) &&
+          (Checker.stmtHasNoRedeclarations(stmt, keySet(state._1.head))._2
+            == Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate._1.head))._2)
   )
 
-  def closedStmtEvalPlusClosedness1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
+  def stmtEvalClosedAndHasNoRedeclarationsPreservation1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
     require(stmtAndStateAreConsistent(stmt, state, blocks))
     val keys = keySet(state._1.head)
     require(Checker.stmtIsClosed(stmt, keys)._1)
+    require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
     evalStmt1Consistency(stmt, state, blocks)
     evalStmt1Aux(stmt, state, blocks)
     stmt match
       case Decl(name, value) =>
         closedExprEval(value, state)
+        hasNoRedeclarationsExprEval(value, state)
       case Assign(to, value) =>
         closedExprEval(value, state)
+        hasNoRedeclarationsExprEval(value, state)
         keySetPost(state._1.head, to)
       case If(cond, body)    =>
         closedExprEval(cond, state)
+        hasNoRedeclarationsExprEval(cond, state)
       case Seq(stmt1, stmt2) =>
-        closedStmtEvalPlusClosedness1(stmt1, state, blocks)
+        stmtEvalClosedAndHasNoRedeclarationsPreservation1(stmt1, state, blocks)
       case _Block(stmt0)       =>
-        closedStmtEvalPlusClosedness1(stmt0, state, blocks + 1)
+        stmtEvalClosedAndHasNoRedeclarationsPreservation1(stmt0, state, blocks + 1)
   }.ensuring(
     Interpreter.evalStmt1(stmt, state, blocks) match
       case Right(conf) => conf match
@@ -161,8 +188,10 @@ object Proofs {
         case Cmd(nstmt, nstate) =>
           stmtAndStateAreConsistent(nstmt, nstate, blocks)
           && Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._1
+          && Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate._1.head))._1
       case Left(exceptions) =>
         !exceptions.contains(LangException.UndeclaredVariable)
+        && !exceptions.contains(LangException.RedeclaredVariable)
         && !exceptions.contains(LangException._EmptyEnvStack)
   )
 
@@ -171,7 +200,7 @@ object Proofs {
     val keys = keySet(state._1.head)
     require(Checker.stmtIsClosed(stmt, keys)._1)
     evalStmt1Consistency(stmt, state, 0)
-    closedStmtEvalPlusClosedness1(stmt, state, 0)
+    stmtEvalClosedAndHasNoRedeclarationsPreservation1(stmt, state, 0)
     Interpreter.evalStmt1(stmt, state, 0) match
       case Left(_) => ()
       case Right(conf) => conf match
@@ -183,6 +212,26 @@ object Proofs {
       case Right(fstate) => true
       case Left(exceptions) =>
         !exceptions.contains(LangException.UndeclaredVariable)
+        && !exceptions.contains(LangException._EmptyEnvStack)
+  )
+
+  def noRedeclarationsStmtEval(stmt: Stmt, state: State): Unit = {
+    require(stmtAndStateAreConsistent(stmt, state, 0))
+    val keys = keySet(state._1.head)
+    require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
+    evalStmt1Consistency(stmt, state, 0)
+    stmtEvalClosedAndHasNoRedeclarationsPreservation1(stmt, state, 0)
+    Interpreter.evalStmt1(stmt, state, 0) match
+      case Left(_) => ()
+      case Right(conf) => conf match
+        case St(nstate) => ()
+        case Cmd(nstmt, nstate) =>
+          noRedeclarationsStmtEval(nstmt, nstate)
+  }.ensuring(
+    Interpreter.evalStmt(stmt, state) match
+      case Right(fstate) => true
+      case Left(exceptions) =>
+        !exceptions.contains(LangException.RedeclaredVariable)
         && !exceptions.contains(LangException._EmptyEnvStack)
   )
 
