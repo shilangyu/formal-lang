@@ -20,7 +20,6 @@ enum Stmt {
   case Assign(val to: Name, val value: Expr)
   
   case If(val cond: Expr, val body: Stmt)
-  case While(val cond: Expr, val body: Stmt)
   case Seq(val stmt1: Stmt, val stmt2: Stmt)
 
   case _Block(val stmt: Stmt)
