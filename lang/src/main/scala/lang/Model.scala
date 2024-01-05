@@ -6,13 +6,10 @@ import stainless.lang.*
 
 type Loc = BigInt
 
-//type ExprVal = Boolean
 type Env = Map[Name, Loc]
-//type Mem = Map[Loc, ExprVal]
 type Mem = Map[Loc, Boolean]
 
-// Loc is the first free location
-type State = (List[Env], Mem, Loc)
+case class State(val env: List[Env], val mem: Mem, val nextLoc: Loc)
 
 enum Conf:
   case St(state: State)

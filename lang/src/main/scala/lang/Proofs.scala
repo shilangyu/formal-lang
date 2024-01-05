@@ -39,17 +39,17 @@ object Proofs {
 
   def stmtAndStateAreConsistent(stmt: Stmt, state: State, blocks: BigInt): Boolean =
     val (b, i) = blocksAreToplevel(stmt)
-    blocks >= 0 && b && i + blocks + 1 == state._1.size && envStackInclusion(
-      state._1.head,
-      state._1.tail
+    blocks >= 0 && b && i + blocks + 1 == state.env.size && envStackInclusion(
+      state.env.head,
+      state.env.tail
     )
 
   def stateIsConsistent(state: State, blocks: BigInt): Boolean =
-    blocks >= 0 && blocks + 1 == state._1.size && envStackInclusion(state._1.head, state._1.tail)
+    blocks >= 0 && blocks + 1 == state.env.size && envStackInclusion(state.env.head, state.env.tail)
 
   @extern // TODO: prove
   def stmtHasNoBlocksIsConsistent(stmt: Stmt, state: State): Unit = {
-    require(state._1.nonEmpty)
+    require(state.env.nonEmpty)
     require(Checker.stmtHasNoBlocks(stmt))
   }.ensuring(
     stmtAndStateAreConsistent(stmt, state, 0)
@@ -59,7 +59,7 @@ object Proofs {
     require(stmtAndStateAreConsistent(stmt, state, blocks))
     stmt match
       case Decl(name, value) =>
-        subsetTest(state._1.head, name, state._3)
+        subsetTest(state.env.head, name, state.nextLoc)
       case Seq(stmt1, stmt2) =>
         evalStmt1Consistency(stmt, state, blocks)
       case _Block(stmt0)     =>
@@ -81,8 +81,8 @@ object Proofs {
     */
   object Closedness {
     def closedExprEval(expr: Expr, state: State): Unit = {
-      require(state._1.nonEmpty)
-      val keys = keySet(state._1.head)
+      require(state.env.nonEmpty)
+      val keys = keySet(state.env.head)
       require(Checker.exprIsClosed(expr, keys))
       expr match
         case True              => ()
@@ -93,8 +93,8 @@ object Proofs {
           closedExprEval(left, state)
           closedExprEval(right, state)
         case Ident(name)       =>
-          keySetPost(state._1.head, name)
-          assert(state._1.head.contains(name))
+          keySetPost(state.env.head, name)
+          assert(state.env.head.contains(name))
     }.ensuring(
       Interpreter.evalExpr(expr, state) match
         case Right(_)         => true
@@ -105,13 +105,13 @@ object Proofs {
 
     def evalStmt1Aux(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, blocks))
-      val keys = keySet(state._1.head)
+      val keys = keySet(state.env.head)
       require(Checker.stmtIsClosed(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, blocks)
       closedStmtEvalPlusClosedness1(stmt, state, blocks)
       stmt match
         case Decl(name, value) =>
-          consistentKeySet(keys, state._1.head, name, state._3)
+          consistentKeySet(keys, state.env.head, name, state.nextLoc)
         case Assign(to, value) => ()
         case If(cond, body)    => ()
         case Seq(stmt1, stmt2) =>
@@ -138,17 +138,17 @@ object Proofs {
           conf match
             case St(nstate)         =>
               stateIsConsistent(nstate, blocks) &&
-              (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
-                == keySet(nstate._1.head))
+              (Checker.stmtIsClosed(stmt, keySet(state.env.head))._2
+                == keySet(nstate.env.head))
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks) &&
-              (Checker.stmtIsClosed(stmt, keySet(state._1.head))._2
-                == Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._2)
+              (Checker.stmtIsClosed(stmt, keySet(state.env.head))._2
+                == Checker.stmtIsClosed(nstmt, keySet(nstate.env.head))._2)
     )
 
     def closedStmtEvalPlusClosedness1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, blocks))
-      val keys = keySet(state._1.head)
+      val keys = keySet(state.env.head)
       require(Checker.stmtIsClosed(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, blocks)
       evalStmt1Aux(stmt, state, blocks)
@@ -157,7 +157,7 @@ object Proofs {
           closedExprEval(value, state)
         case Assign(to, value) =>
           closedExprEval(value, state)
-          keySetPost(state._1.head, to)
+          keySetPost(state.env.head, to)
         case If(cond, body)    =>
           closedExprEval(cond, state)
         case Seq(stmt1, stmt2) =>
@@ -173,7 +173,7 @@ object Proofs {
               stateIsConsistent(nstate, blocks)
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks)
-              && Checker.stmtIsClosed(nstmt, keySet(nstate._1.head))._1
+              && Checker.stmtIsClosed(nstmt, keySet(nstate.env.head))._1
         case Left(exceptions) =>
           !exceptions.contains(LangException.UndeclaredVariable)
           && !exceptions.contains(LangException._EmptyEnvStack)
@@ -181,7 +181,7 @@ object Proofs {
 
     def closedStmtEval(stmt: Stmt, state: State): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, 0))
-      val keys = keySet(state._1.head)
+      val keys = keySet(state.env.head)
       require(Checker.stmtIsClosed(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, 0)
       closedStmtEvalPlusClosedness1(stmt, state, 0)
@@ -206,8 +206,8 @@ object Proofs {
     */
   object NoRedeclarations {
     def hasNoRedeclarationsExprEval(expr: Expr, state: State): Unit = {
-      require(state._1.nonEmpty)
-      val keys = keySet(state._1.head)
+      require(state.env.nonEmpty)
+      val keys = keySet(state.env.head)
       expr match
         case True              => ()
         case False             => ()
@@ -225,13 +225,13 @@ object Proofs {
 
     def evalStmt1Aux(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, blocks))
-      val keys = keySet(state._1.head)
+      val keys = keySet(state.env.head)
       require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, blocks)
       noRedeclStmtEvalPlusNoRedecl1(stmt, state, blocks)
       stmt match
         case Decl(name, value) =>
-          consistentKeySet(keys, state._1.head, name, state._3)
+          consistentKeySet(keys, state.env.head, name, state.nextLoc)
         case Assign(to, value) => ()
         case If(cond, body)    => ()
         case Seq(stmt1, stmt2) =>
@@ -258,17 +258,17 @@ object Proofs {
           conf match
             case St(nstate)         =>
               stateIsConsistent(nstate, blocks) &&
-              (Checker.stmtHasNoRedeclarations(stmt, keySet(state._1.head))._2
-                == keySet(nstate._1.head))
+              (Checker.stmtHasNoRedeclarations(stmt, keySet(state.env.head))._2
+                == keySet(nstate.env.head))
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks) &&
-              (Checker.stmtHasNoRedeclarations(stmt, keySet(state._1.head))._2
-                == Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate._1.head))._2)
+              (Checker.stmtHasNoRedeclarations(stmt, keySet(state.env.head))._2
+                == Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.env.head))._2)
     )
 
     def noRedeclStmtEvalPlusNoRedecl1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, blocks))
-      val keys = keySet(state._1.head)
+      val keys = keySet(state.env.head)
       require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, blocks)
       evalStmt1Aux(stmt, state, blocks)
@@ -277,7 +277,7 @@ object Proofs {
           hasNoRedeclarationsExprEval(value, state)
         case Assign(to, value) =>
           hasNoRedeclarationsExprEval(value, state)
-          keySetPost(state._1.head, to)
+          keySetPost(state.env.head, to)
         case If(cond, body)    =>
           hasNoRedeclarationsExprEval(cond, state)
         case Seq(stmt1, stmt2) =>
@@ -293,7 +293,7 @@ object Proofs {
               stateIsConsistent(nstate, blocks)
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks)
-              && Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate._1.head))._1
+              && Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.env.head))._1
         case Left(exceptions) =>
           !exceptions.contains(LangException.RedeclaredVariable)
           && !exceptions.contains(LangException._EmptyEnvStack)
@@ -301,7 +301,7 @@ object Proofs {
 
     def noRedeclarationsStmtEval(stmt: Stmt, state: State): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, 0))
-      val keys = keySet(state._1.head)
+      val keys = keySet(state.env.head)
       require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, 0)
       noRedeclStmtEvalPlusNoRedecl1(stmt, state, 0)
@@ -326,10 +326,10 @@ object Proofs {
     */
   object UniqueOwnership {
 
-    /** The next free location variable (state._3) can only increase in value. */
+    /** The next free location variable (state.nextLoc) can only increase in value. */
     def locIncreases(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val env = state._1
+      val env = state.env
       stmt match
         case Decl(_, _)    =>
           Interpreter.evalStmt1(stmt, state, blocks) match
@@ -337,7 +337,7 @@ object Proofs {
             case Right(conf) =>
               conf match
                 case St(nstate) =>
-                  assert(nstate._3 == state._3 + 1)
+                  assert(nstate.nextLoc == state.nextLoc + 1)
                 case Cmd(_, _)  => ()
         case Assign(_, _)  => ()
         case If(_, _)      => ()
@@ -352,17 +352,16 @@ object Proofs {
         case Left(_)     => true
         case Right(conf) =>
           conf match
-            case St(nstate)     => nstate._3 >= state._3
-            case Cmd(_, nstate) => nstate._3 >= state._3
+            case St(nstate)     => nstate.nextLoc >= state.nextLoc
+            case Cmd(_, nstate) => nstate.nextLoc >= state.nextLoc
     )
 
-    /* The next free location variable (state._3) can only
+    /* The next free location variable (state.nextLoc) can only
      * increase by one at every interpretation step. */
     def locIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val env = state._1
-      val mem = state._2
-      val loc = state._3
+      val State(env, mem, loc) = state
+
       require(!mem.contains(loc))
       stmt match
         case Decl(_, _)    =>
@@ -371,7 +370,7 @@ object Proofs {
             case Right(conf) =>
               conf match
                 case St(nstate) =>
-                  assert(nstate._3 == state._3 + 1)
+                  assert(nstate.nextLoc == state.nextLoc + 1)
                 case Cmd(_, _)  => ()
         case Assign(_, _)  => ()
         case If(_, _)      => ()
@@ -387,17 +386,15 @@ object Proofs {
         case Right(conf) =>
           conf match
             case St(nstate)     =>
-              nstate._3 == state._3 || nstate._3 == state._3 + 1
+              nstate.nextLoc == state.nextLoc || nstate.nextLoc == state.nextLoc + 1
             case Cmd(_, nstate) =>
-              nstate._3 == state._3 || nstate._3 == state._3 + 1
+              nstate.nextLoc == state.nextLoc || nstate.nextLoc == state.nextLoc + 1
     )
 
     /* Loc increses by one with a declaration */
     def locIncreasesWithDecl(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val env = state._1
-      val mem = state._2
-      val loc = state._3
+      val State(env, mem, loc) = state
       stmt match
         case Decl(_, _)    =>
           Interpreter.evalStmt1(stmt, state, blocks) match
@@ -405,7 +402,7 @@ object Proofs {
             case Right(conf) =>
               conf match
                 case St(nstate) =>
-                  assert(nstate._3 == state._3 + 1)
+                  assert(nstate.nextLoc == state.nextLoc + 1)
                 case Cmd(_, _)  => ()
         case Assign(_, _)  => ()
         case If(_, _)      => ()
@@ -423,9 +420,9 @@ object Proofs {
             case Right(conf) =>
               conf match
                 case St(nstate)     =>
-                  nstate._3 == state._3 + 1
+                  nstate.nextLoc == state.nextLoc + 1
                 case Cmd(_, nstate) =>
-                  nstate._3 == state._3 + 1
+                  nstate.nextLoc == state.nextLoc + 1
         case _                 => true
     )
 
@@ -433,10 +430,10 @@ object Proofs {
      * the top env contains name and name is mapped to the previous next
      * free loc */
     def envListUpdated(state: State, x: Name): List[Env] = {
-      require(state._1.nonEmpty)
-      val nenv = (state._1.head + (x -> state._3)) :: state._1.tail
+      require(state.env.nonEmpty)
+      val nenv = (state.env.head + (x -> state.nextLoc)) :: state.env.tail
       nenv
-    }.ensuring(r => (r.head contains x) && r.head(x) == state._3)
+    }.ensuring(r => (r.head contains x) && r.head(x) == state.nextLoc)
 
     def envListEquality(env1: List[Env], env2: List[Env], x: Name, l: Loc): Unit = {
       require(env1.nonEmpty && env2.nonEmpty)
@@ -445,7 +442,7 @@ object Proofs {
       require(!(env2.head contains x))
     }.ensuring(env1.head == (env2.head + (x -> l)) - x)
 
-    /* Declarations always allocate using the next free location (state._3) */
+    /* Declarations always allocate using the next free location (state.nextLoc) */
     def declUsesNextLoc(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       stmt match
         case Decl(name, value) =>
@@ -455,8 +452,8 @@ object Proofs {
               conf match
                 case St(nstate) =>
                   envListUpdated(state, name)
-                  assert(nstate._1.head contains name) // new var in previous loc
-                  assert(nstate._1.head(name) == state._3) // new var in previous loc
+                  assert(nstate.env.head contains name) // new var in previous loc
+                  assert(nstate.env.head(name) == state.nextLoc) // new var in previous loc
                 case Cmd(_, _)  => ()
         case Assign(_, _)      => ()
         case If(_, _)          => ()
@@ -474,18 +471,18 @@ object Proofs {
             case Right(conf) =>
               conf match
                 case St(nstate)     =>
-                  nstate._1.head(name) == state._3 // new var in previous loc
+                  nstate.env.head(name) == state.nextLoc // new var in previous loc
                 case Cmd(_, nstate) =>
-                  nstate._1.head(name) == state._3
+                  nstate.env.head(name) == state.nextLoc
         case _                 => true
     )
 
     /* Next free location never in memory */
     // TODO: Improve precodition: every loc greater than next loc is not in memory
     def nextLocNeverInMemory(stmt: Stmt, state: State, blocks: BigInt, v: Boolean): Unit = {
-      require(!(state._2 contains state._3))
-      require(!(state._2 contains state._3 + 1))
-      require(!(state._2 contains state._3 + 2))
+      require(!(state.mem contains state.nextLoc))
+      require(!(state.mem contains state.nextLoc + 1))
+      require(!(state.mem contains state.nextLoc + 2))
       stmt match
         case Decl(_, _)    =>
           Interpreter.evalStmt1(stmt, state, blocks) match
@@ -493,7 +490,7 @@ object Proofs {
             case Right(conf) =>
               conf match
                 case St(nstate) =>
-                  assert(!(nstate._2 contains nstate._3))
+                  assert(!(nstate.mem contains nstate.nextLoc))
                 case Cmd(_, _)  => ()
         case Assign(_, _)  => ()
         case If(_, _)      => ()
@@ -509,9 +506,9 @@ object Proofs {
         case Right(conf) =>
           conf match
             case St(nstate)     =>
-              !(nstate._2 contains nstate._3)
+              !(nstate.mem contains nstate.nextLoc)
             case Cmd(_, nstate) =>
-              !(nstate._2 contains nstate._3)
+              !(nstate.mem contains nstate.nextLoc)
     )
   }
 
@@ -564,9 +561,7 @@ object Proofs {
 
   /* At every interpretation step, memory can only increase by one. */
   def memIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt, v: Boolean): Unit = {
-    val env = state._1
-    val mem = state._2
-    val loc = state._3
+    val State(env, mem, loc) = state
     require(!(mem contains loc))
     stmt match
       case Decl(name, _) =>
@@ -575,60 +570,60 @@ object Proofs {
           case Right(conf) =>
             conf match
               case St(nstate)     =>
-                assert(nstate._2 - (loc) == state._2) // VALID
-                equalKeyCardinalityIncrement(state._2, nstate._2, loc)
-                assert(state._2.keys.length + 1 == nstate._2.keys.length)
+                assert(nstate.mem - (loc) == state.mem) // VALID
+                equalKeyCardinalityIncrement(state.mem, nstate.mem, loc)
+                assert(state.mem.keys.length + 1 == nstate.mem.keys.length)
               case Cmd(_, nstate) =>
-                assert(nstate._2 == state._2)
-                equalKeyCardinality(state._2, nstate._2)
-                assert(state._2.keys.length == nstate._2.keys.length)
+                assert(nstate.mem == state.mem)
+                equalKeyCardinality(state.mem, nstate.mem)
+                assert(state.mem.keys.length == nstate.mem.keys.length)
       case Assign(to, _) =>
         Interpreter.evalStmt1(stmt, state, blocks) match
           case Left(_)     => ()
           case Right(conf) =>
             conf match
               case St(nstate)     =>
-                val toLoc = state._1.head(to)
+                val toLoc = state.env.head(to)
                 equalKeyCardPreserved(
-                  state._2 - toLoc,
-                  nstate._2 - toLoc,
+                  state.mem - toLoc,
+                  nstate.mem - toLoc,
                   toLoc,
-                  state._2(toLoc),
-                  nstate._2(toLoc)
+                  state.mem(toLoc),
+                  nstate.mem(toLoc)
                 )
-                assert(nstate._2 - toLoc == state._2 - toLoc)
-                equalKeyCardUpdateCommonKey(state._2, state._2, toLoc, v)
-                assert(state._2.keys.length == nstate._2.keys.length)
+                assert(nstate.mem - toLoc == state.mem - toLoc)
+                equalKeyCardUpdateCommonKey(state.mem, state.mem, toLoc, v)
+                assert(state.mem.keys.length == nstate.mem.keys.length)
               case Cmd(_, nstate) =>
-                assert(nstate._2 == state._2)
-                equalKeyCardinality(state._2, nstate._2)
-                assert(state._2.keys.length == nstate._2.keys.length)
+                assert(nstate.mem == state.mem)
+                equalKeyCardinality(state.mem, nstate.mem)
+                assert(state.mem.keys.length == nstate.mem.keys.length)
       case If(_, _)      =>
         Interpreter.evalStmt1(stmt, state, blocks) match
           case Left(_)     => ()
           case Right(conf) =>
             conf match
               case St(nstate)     =>
-                assert(nstate._2 == state._2)
-                equalKeyCardinality(state._2, nstate._2)
-                assert(state._2.keys.length == nstate._2.keys.length)
+                assert(nstate.mem == state.mem)
+                equalKeyCardinality(state.mem, nstate.mem)
+                assert(state.mem.keys.length == nstate.mem.keys.length)
               case Cmd(_, nstate) =>
-                assert(nstate._2 == state._2)
-                equalKeyCardinality(state._2, nstate._2)
-                assert(state._2.keys.length == nstate._2.keys.length)
+                assert(nstate.mem == state.mem)
+                equalKeyCardinality(state.mem, nstate.mem)
+                assert(state.mem.keys.length == nstate.mem.keys.length)
       /*
       case While(_, _) =>
         Interpreter.traceStmt1(stmt, state) match
           case Left(_)      => ()
           case Right(conf)  => conf match
-            case St(nstate) =>
-              assert(nstate._2 == state._2)
-              equalKeyCardinality(state._2, nstate._2)
-              assert(state._2.keys.length == nstate._2.keys.length)
+            case nstate:State =>
+              assert(nstate.mem == state.mem)
+              equalKeyCardinality(state.mem, nstate.mem)
+              assert(state.mem.keys.length == nstate.mem.keys.length)
             case Cmd(_, nstate) =>
-              assert(nstate._2 == state._2)
-              equalKeyCardinality(state._2, nstate._2)
-              assert(state._2.keys.length == nstate._2.keys.length)
+              assert(nstate.mem == state.mem)
+              equalKeyCardinality(state.mem, nstate.mem)
+              assert(state.mem.keys.length == nstate.mem.keys.length)
        */
       case Free(name)    => ()
       case Seq(stmt1, _) =>
@@ -641,11 +636,11 @@ object Proofs {
       case Right(conf) =>
         conf match
           case St(nstate)     =>
-            nstate._2.keys.length == state._2.keys.length ||
-            nstate._2.keys.length == state._2.keys.length + 1
+            nstate.mem.keys.length == state.mem.keys.length ||
+            nstate.mem.keys.length == state.mem.keys.length + 1
           case Cmd(_, nstate) =>
-            nstate._2.keys.length == state._2.keys.length ||
-            nstate._2.keys.length == state._2.keys.length + 1
+            nstate.mem.keys.length == state.mem.keys.length ||
+            nstate.mem.keys.length == state.mem.keys.length + 1
   )
 
 }
