@@ -1,9 +1,8 @@
 package lang
 
 import stainless.*
-import stainless.lang.*
 import stainless.collection.*
-
+import stainless.lang.*
 
 type Loc = BigInt
 
@@ -19,13 +18,12 @@ enum Conf:
   case St(state: State)
   case Cmd(stmt: Stmt, state: State)
 
-
 enum LangException:
   case _EmptyEnvStack
 
   case UndeclaredVariable
   case RedeclaredVariable
-  
+
   case InvalidLoc
 
 // ---
