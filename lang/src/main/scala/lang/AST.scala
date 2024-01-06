@@ -1,9 +1,8 @@
 package lang
 
 import stainless.*
-import stainless.lang.*
 import stainless.collection.*
-
+import stainless.lang.*
 
 type Name = String
 
@@ -18,7 +17,7 @@ enum Expr {
 enum Stmt {
   case Decl(val name: Name, val value: Expr)
   case Assign(val to: Name, val value: Expr)
-  
+
   case If(val cond: Expr, val body: Stmt)
   case Seq(val stmt1: Stmt, val stmt2: Stmt)
 
