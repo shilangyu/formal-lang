@@ -71,8 +71,8 @@ object Proofs {
 
   // ---
 
-  /** Lemmas and proofs of closedness: A program is closed if whenever evaluating Ident〈name〉 or
-    * Assign〈name, expr〉, env(name) is defined.
+  /** Lemmas and proofs of closedness: A program is closed if whenever evaluating Ident〈name〉,
+    * Free〈name〉, or Assign〈name, expr〉, env(name) is defined.
     */
   object Closedness {
     def closedExprEval(expr: Expr, state: State): Unit = {
