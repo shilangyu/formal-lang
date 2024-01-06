@@ -50,21 +50,13 @@ object Proofs {
       state.scopes.tail
     )
 
-  @extern // TODO: prove
-  def stmtHasNoBlocksIsConsistent(stmt: Stmt, state: State): Unit = {
-    require(state.scopes.nonEmpty)
-    require(Checker.stmtHasNoBlocks(stmt))
-  }.ensuring(
-    stmtAndStateAreConsistent(stmt, state, 0)
-  )
-
   def evalStmt1Consistency(stmt: Stmt, state: State, blocks: BigInt): Unit = {
     require(stmtAndStateAreConsistent(stmt, state, blocks))
     stmt match
       case Decl(name, value) =>
         subsetTest(state.scopes.head.env, name, state.nextLoc)
       case Seq(stmt1, stmt2) =>
-        evalStmt1Consistency(stmt, state, blocks)
+        evalStmt1Consistency(stmt1, state, blocks)
       case _Block(stmt0)     =>
         evalStmt1Consistency(stmt0, state, blocks + 1)
       case _                 => ()
@@ -563,89 +555,4 @@ object Proofs {
     require(!(map1 contains k))
     require(!(map2 contains k))
   }.ensuring((map1 + (k -> v1)).keys.length == (map2 + (k -> v2)).keys.length)
-
-  /* At every interpretation step, memory can only increase by one. */
-  def memIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt, v: Boolean): Unit = {
-    val State(scopes, mem, loc) = state
-    require(!(mem contains loc))
-    stmt match
-      case Decl(name, _) =>
-        Interpreter.evalStmt1(stmt, state, blocks) match
-          case Left(_)     => ()
-          case Right(conf) =>
-            conf match
-              case St(nstate)     =>
-                assert(nstate.mem - (loc) == state.mem) // VALID
-                equalKeyCardinalityIncrement(state.mem, nstate.mem, loc)
-                assert(state.mem.keys.length + 1 == nstate.mem.keys.length)
-              case Cmd(_, nstate) =>
-                assert(nstate.mem == state.mem)
-                equalKeyCardinality(state.mem, nstate.mem)
-                assert(state.mem.keys.length == nstate.mem.keys.length)
-      case Assign(to, _) =>
-        Interpreter.evalStmt1(stmt, state, blocks) match
-          case Left(_)     => ()
-          case Right(conf) =>
-            conf match
-              case St(nstate)     =>
-                val toLoc = state.scopes.head.env(to)
-                equalKeyCardPreserved(
-                  state.mem - toLoc,
-                  nstate.mem - toLoc,
-                  toLoc,
-                  state.mem(toLoc),
-                  nstate.mem(toLoc)
-                )
-                assert(nstate.mem - toLoc == state.mem - toLoc)
-                equalKeyCardUpdateCommonKey(state.mem, state.mem, toLoc, v)
-                assert(state.mem.keys.length == nstate.mem.keys.length)
-              case Cmd(_, nstate) =>
-                assert(nstate.mem == state.mem)
-                equalKeyCardinality(state.mem, nstate.mem)
-                assert(state.mem.keys.length == nstate.mem.keys.length)
-      case If(_, _)      =>
-        Interpreter.evalStmt1(stmt, state, blocks) match
-          case Left(_)     => ()
-          case Right(conf) =>
-            conf match
-              case St(nstate)     =>
-                assert(nstate.mem == state.mem)
-                equalKeyCardinality(state.mem, nstate.mem)
-                assert(state.mem.keys.length == nstate.mem.keys.length)
-              case Cmd(_, nstate) =>
-                assert(nstate.mem == state.mem)
-                equalKeyCardinality(state.mem, nstate.mem)
-                assert(state.mem.keys.length == nstate.mem.keys.length)
-      /*
-      case While(_, _) =>
-        Interpreter.traceStmt1(stmt, state) match
-          case Left(_)      => ()
-          case Right(conf)  => conf match
-            case nstate:State =>
-              assert(nstate.mem == state.mem)
-              equalKeyCardinality(state.mem, nstate.mem)
-              assert(state.mem.keys.length == nstate.mem.keys.length)
-            case Cmd(_, nstate) =>
-              assert(nstate.mem == state.mem)
-              equalKeyCardinality(state.mem, nstate.mem)
-              assert(state.mem.keys.length == nstate.mem.keys.length)
-       */
-      case Free(name)    => ()
-      case Seq(stmt1, _) =>
-        memIncreasesByOne(stmt1, state, blocks, v)
-      case _Block(stmt1) =>
-        memIncreasesByOne(stmt1, state, blocks + 1, v)
-  }.ensuring(
-    Interpreter.evalStmt1(stmt, state, blocks) match
-      case Left(_)     => true
-      case Right(conf) =>
-        conf match
-          case St(nstate)     =>
-            nstate.mem.keys.length == state.mem.keys.length ||
-            nstate.mem.keys.length == state.mem.keys.length + 1
-          case Cmd(_, nstate) =>
-            nstate.mem.keys.length == state.mem.keys.length ||
-            nstate.mem.keys.length == state.mem.keys.length + 1
-  )
-
 }

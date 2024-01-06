@@ -4,7 +4,7 @@ lazy val root = project
   .in(file("."))
   .enablePlugins(StainlessPlugin)
   .settings(
-    name := "lang",
+    name             := "lang",
     stainlessEnabled := false
   )
 

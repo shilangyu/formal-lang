@@ -82,8 +82,14 @@ object Interpreter {
               case St(nstate)          => Right(Cmd(stmt2, nstate))
               case Cmd(nstmt1, nstate) => Right(Cmd(Seq(nstmt1, stmt2), nstate))
       case Free(name)        =>
-        // TODO: implement Free
-        Right(St(State(scopes, mem, nl)))
+        if scopes.isEmpty then Left(Set(LangException._EmptyScopeStack))
+        else
+          scopes.head.env.get(name) match
+            case Some(loc) =>
+              mem.contains(loc) match
+                case true  => Right(St(State(scopes, mem.removed(loc), nl)))
+                case false => Left(Set(LangException.InvalidLoc))
+            case None()    => Left(Set(LangException.UndeclaredVariable))
       case _Block(stmt0)     =>
         evalStmt1(stmt0, state, blocks + 1) match
           case Left(b)     => Left(b)
