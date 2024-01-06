@@ -16,8 +16,8 @@ object Proofs {
   // ---
   // Interpreter
 
-  private def envStackInclusion(env: Env, envs: List[Env]): Boolean = envs match
-    case Cons(h, t) => keySet(h).subsetOf(keySet(env)) && envStackInclusion(h, t)
+  private def envStackInclusion(env: Env, scopes: List[Scope]): Boolean = scopes match
+    case Cons(h, t) => keySet(h.env).subsetOf(keySet(env)) && envStackInclusion(h.env, t)
     case Nil()      => true
 
   private def blocksAreToplevel(stmt: Stmt): (Boolean, BigInt) = {
@@ -39,17 +39,20 @@ object Proofs {
 
   def stmtAndStateAreConsistent(stmt: Stmt, state: State, blocks: BigInt): Boolean =
     val (b, i) = blocksAreToplevel(stmt)
-    blocks >= 0 && b && i + blocks + 1 == state.env.size && envStackInclusion(
-      state.env.head,
-      state.env.tail
+    blocks >= 0 && b && i + blocks + 1 == state.scopes.size && envStackInclusion(
+      state.scopes.head.env,
+      state.scopes.tail
     )
 
   def stateIsConsistent(state: State, blocks: BigInt): Boolean =
-    blocks >= 0 && blocks + 1 == state.env.size && envStackInclusion(state.env.head, state.env.tail)
+    blocks >= 0 && blocks + 1 == state.scopes.size && envStackInclusion(
+      state.scopes.head.env,
+      state.scopes.tail
+    )
 
   @extern // TODO: prove
   def stmtHasNoBlocksIsConsistent(stmt: Stmt, state: State): Unit = {
-    require(state.env.nonEmpty)
+    require(state.scopes.nonEmpty)
     require(Checker.stmtHasNoBlocks(stmt))
   }.ensuring(
     stmtAndStateAreConsistent(stmt, state, 0)
@@ -59,7 +62,7 @@ object Proofs {
     require(stmtAndStateAreConsistent(stmt, state, blocks))
     stmt match
       case Decl(name, value) =>
-        subsetTest(state.env.head, name, state.nextLoc)
+        subsetTest(state.scopes.head.env, name, state.nextLoc)
       case Seq(stmt1, stmt2) =>
         evalStmt1Consistency(stmt, state, blocks)
       case _Block(stmt0)     =>
@@ -81,8 +84,8 @@ object Proofs {
     */
   object Closedness {
     def closedExprEval(expr: Expr, state: State): Unit = {
-      require(state.env.nonEmpty)
-      val keys = keySet(state.env.head)
+      require(state.scopes.nonEmpty)
+      val keys = keySet(state.scopes.head.env)
       require(Checker.exprIsClosed(expr, keys))
       expr match
         case True              => ()
@@ -93,25 +96,25 @@ object Proofs {
           closedExprEval(left, state)
           closedExprEval(right, state)
         case Ident(name)       =>
-          keySetPost(state.env.head, name)
-          assert(state.env.head.contains(name))
+          keySetPost(state.scopes.head.env, name)
+          assert(state.scopes.head.env.contains(name))
     }.ensuring(
       Interpreter.evalExpr(expr, state) match
         case Right(_)         => true
         case Left(exceptions) =>
           !exceptions.contains(LangException.UndeclaredVariable)
-          && !exceptions.contains(LangException._EmptyEnvStack)
+          && !exceptions.contains(LangException._EmptyScopeStack)
     )
 
     def evalStmt1Aux(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, blocks))
-      val keys = keySet(state.env.head)
+      val keys = keySet(state.scopes.head.env)
       require(Checker.stmtIsClosed(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, blocks)
       closedStmtEvalPlusClosedness1(stmt, state, blocks)
       stmt match
         case Decl(name, value) =>
-          consistentKeySet(keys, state.env.head, name, state.nextLoc)
+          consistentKeySet(keys, state.scopes.head.env, name, state.nextLoc)
         case Assign(to, value) => ()
         case If(cond, body)    => ()
         case Seq(stmt1, stmt2) =>
@@ -138,17 +141,17 @@ object Proofs {
           conf match
             case St(nstate)         =>
               stateIsConsistent(nstate, blocks) &&
-              (Checker.stmtIsClosed(stmt, keySet(state.env.head))._2
-                == keySet(nstate.env.head))
+              (Checker.stmtIsClosed(stmt, keySet(state.scopes.head.env))._2
+                == keySet(nstate.scopes.head.env))
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks) &&
-              (Checker.stmtIsClosed(stmt, keySet(state.env.head))._2
-                == Checker.stmtIsClosed(nstmt, keySet(nstate.env.head))._2)
+              (Checker.stmtIsClosed(stmt, keySet(state.scopes.head.env))._2
+                == Checker.stmtIsClosed(nstmt, keySet(nstate.scopes.head.env))._2)
     )
 
     def closedStmtEvalPlusClosedness1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, blocks))
-      val keys = keySet(state.env.head)
+      val keys = keySet(state.scopes.head.env)
       require(Checker.stmtIsClosed(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, blocks)
       evalStmt1Aux(stmt, state, blocks)
@@ -157,7 +160,7 @@ object Proofs {
           closedExprEval(value, state)
         case Assign(to, value) =>
           closedExprEval(value, state)
-          keySetPost(state.env.head, to)
+          keySetPost(state.scopes.head.env, to)
         case If(cond, body)    =>
           closedExprEval(cond, state)
         case Seq(stmt1, stmt2) =>
@@ -173,15 +176,15 @@ object Proofs {
               stateIsConsistent(nstate, blocks)
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks)
-              && Checker.stmtIsClosed(nstmt, keySet(nstate.env.head))._1
+              && Checker.stmtIsClosed(nstmt, keySet(nstate.scopes.head.env))._1
         case Left(exceptions) =>
           !exceptions.contains(LangException.UndeclaredVariable)
-          && !exceptions.contains(LangException._EmptyEnvStack)
+          && !exceptions.contains(LangException._EmptyScopeStack)
     )
 
     def closedStmtEval(stmt: Stmt, state: State): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, 0))
-      val keys = keySet(state.env.head)
+      val keys = keySet(state.scopes.head.env)
       require(Checker.stmtIsClosed(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, 0)
       closedStmtEvalPlusClosedness1(stmt, state, 0)
@@ -197,7 +200,7 @@ object Proofs {
         case Right(fstate)    => true
         case Left(exceptions) =>
           !exceptions.contains(LangException.UndeclaredVariable)
-          && !exceptions.contains(LangException._EmptyEnvStack)
+          && !exceptions.contains(LangException._EmptyScopeStack)
     )
   }
 
@@ -206,8 +209,8 @@ object Proofs {
     */
   object NoRedeclarations {
     def hasNoRedeclarationsExprEval(expr: Expr, state: State): Unit = {
-      require(state.env.nonEmpty)
-      val keys = keySet(state.env.head)
+      require(state.scopes.nonEmpty)
+      val keys = keySet(state.scopes.head.env)
       expr match
         case True              => ()
         case False             => ()
@@ -220,18 +223,18 @@ object Proofs {
         case Right(_)         => true
         case Left(exceptions) =>
           !exceptions.contains(LangException.RedeclaredVariable)
-          && !exceptions.contains(LangException._EmptyEnvStack)
+          && !exceptions.contains(LangException._EmptyScopeStack)
     )
 
     def evalStmt1Aux(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, blocks))
-      val keys = keySet(state.env.head)
+      val keys = keySet(state.scopes.head.env)
       require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, blocks)
       noRedeclStmtEvalPlusNoRedecl1(stmt, state, blocks)
       stmt match
         case Decl(name, value) =>
-          consistentKeySet(keys, state.env.head, name, state.nextLoc)
+          consistentKeySet(keys, state.scopes.head.env, name, state.nextLoc)
         case Assign(to, value) => ()
         case If(cond, body)    => ()
         case Seq(stmt1, stmt2) =>
@@ -258,17 +261,17 @@ object Proofs {
           conf match
             case St(nstate)         =>
               stateIsConsistent(nstate, blocks) &&
-              (Checker.stmtHasNoRedeclarations(stmt, keySet(state.env.head))._2
-                == keySet(nstate.env.head))
+              (Checker.stmtHasNoRedeclarations(stmt, keySet(state.scopes.head.env))._2
+                == keySet(nstate.scopes.head.env))
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks) &&
-              (Checker.stmtHasNoRedeclarations(stmt, keySet(state.env.head))._2
-                == Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.env.head))._2)
+              (Checker.stmtHasNoRedeclarations(stmt, keySet(state.scopes.head.env))._2
+                == Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.scopes.head.env))._2)
     )
 
     def noRedeclStmtEvalPlusNoRedecl1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, blocks))
-      val keys = keySet(state.env.head)
+      val keys = keySet(state.scopes.head.env)
       require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, blocks)
       evalStmt1Aux(stmt, state, blocks)
@@ -277,7 +280,7 @@ object Proofs {
           hasNoRedeclarationsExprEval(value, state)
         case Assign(to, value) =>
           hasNoRedeclarationsExprEval(value, state)
-          keySetPost(state.env.head, to)
+          keySetPost(state.scopes.head.env, to)
         case If(cond, body)    =>
           hasNoRedeclarationsExprEval(cond, state)
         case Seq(stmt1, stmt2) =>
@@ -293,15 +296,15 @@ object Proofs {
               stateIsConsistent(nstate, blocks)
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks)
-              && Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.env.head))._1
+              && Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.scopes.head.env))._1
         case Left(exceptions) =>
           !exceptions.contains(LangException.RedeclaredVariable)
-          && !exceptions.contains(LangException._EmptyEnvStack)
+          && !exceptions.contains(LangException._EmptyScopeStack)
     )
 
     def noRedeclarationsStmtEval(stmt: Stmt, state: State): Unit = {
       require(stmtAndStateAreConsistent(stmt, state, 0))
-      val keys = keySet(state.env.head)
+      val keys = keySet(state.scopes.head.env)
       require(Checker.stmtHasNoRedeclarations(stmt, keys)._1)
       evalStmt1Consistency(stmt, state, 0)
       noRedeclStmtEvalPlusNoRedecl1(stmt, state, 0)
@@ -317,7 +320,7 @@ object Proofs {
         case Right(fstate)    => true
         case Left(exceptions) =>
           !exceptions.contains(LangException.RedeclaredVariable)
-          && !exceptions.contains(LangException._EmptyEnvStack)
+          && !exceptions.contains(LangException._EmptyScopeStack)
     )
   }
 
@@ -329,7 +332,6 @@ object Proofs {
     /** The next free location variable (state.nextLoc) can only increase in value. */
     def locIncreases(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val env = state.env
       stmt match
         case Decl(_, _)    =>
           Interpreter.evalStmt1(stmt, state, blocks) match
@@ -360,7 +362,7 @@ object Proofs {
      * increase by one at every interpretation step. */
     def locIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val State(env, mem, loc) = state
+      val State(scopes, mem, loc) = state
 
       require(!mem.contains(loc))
       stmt match
@@ -394,7 +396,7 @@ object Proofs {
     /* Loc increses by one with a declaration */
     def locIncreasesWithDecl(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val State(env, mem, loc) = state
+      val State(scopes, mem, loc) = state
       stmt match
         case Decl(_, _)    =>
           Interpreter.evalStmt1(stmt, state, blocks) match
@@ -429,11 +431,14 @@ object Proofs {
     /* If a list of envs is updated with a name and the next free loc,
      * the top env contains name and name is mapped to the previous next
      * free loc */
-    def envListUpdated(state: State, x: Name): List[Env] = {
-      require(state.env.nonEmpty)
-      val nenv = (state.env.head + (x -> state.nextLoc)) :: state.env.tail
+    def envListUpdated(state: State, x: Name): List[Scope] = {
+      require(state.scopes.nonEmpty)
+      val nenv = Scope(
+        state.scopes.head.env + (x -> state.nextLoc),
+        state.scopes.head.freed
+      ) :: state.scopes.tail
       nenv
-    }.ensuring(r => (r.head contains x) && r.head(x) == state.nextLoc)
+    }.ensuring(r => (r.head.env contains x) && r.head.env(x) == state.nextLoc)
 
     def envListEquality(env1: List[Env], env2: List[Env], x: Name, l: Loc): Unit = {
       require(env1.nonEmpty && env2.nonEmpty)
@@ -452,8 +457,8 @@ object Proofs {
               conf match
                 case St(nstate) =>
                   envListUpdated(state, name)
-                  assert(nstate.env.head contains name) // new var in previous loc
-                  assert(nstate.env.head(name) == state.nextLoc) // new var in previous loc
+                  assert(nstate.scopes.head.env contains name) // new var in previous loc
+                  assert(nstate.scopes.head.env(name) == state.nextLoc) // new var in previous loc
                 case Cmd(_, _)  => ()
         case Assign(_, _)      => ()
         case If(_, _)          => ()
@@ -471,9 +476,9 @@ object Proofs {
             case Right(conf) =>
               conf match
                 case St(nstate)     =>
-                  nstate.env.head(name) == state.nextLoc // new var in previous loc
+                  nstate.scopes.head.env(name) == state.nextLoc // new var in previous loc
                 case Cmd(_, nstate) =>
-                  nstate.env.head(name) == state.nextLoc
+                  nstate.scopes.head.env(name) == state.nextLoc
         case _                 => true
     )
 
@@ -561,7 +566,7 @@ object Proofs {
 
   /* At every interpretation step, memory can only increase by one. */
   def memIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt, v: Boolean): Unit = {
-    val State(env, mem, loc) = state
+    val State(scopes, mem, loc) = state
     require(!(mem contains loc))
     stmt match
       case Decl(name, _) =>
@@ -583,7 +588,7 @@ object Proofs {
           case Right(conf) =>
             conf match
               case St(nstate)     =>
-                val toLoc = state.env.head(to)
+                val toLoc = state.scopes.head.env(to)
                 equalKeyCardPreserved(
                   state.mem - toLoc,
                   nstate.mem - toLoc,

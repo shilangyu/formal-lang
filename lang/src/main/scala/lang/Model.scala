@@ -9,14 +9,21 @@ type Loc = BigInt
 type Env = Map[Name, Loc]
 type Mem = Map[Loc, Boolean]
 
-case class State(val env: List[Env], val mem: Mem, val nextLoc: Loc)
+case class Scope(val env: Env, val freed: Set[Name])
+case class State(val scopes: List[Scope], val mem: Mem, val nextLoc: Loc)
 
 enum Conf:
   case St(state: State)
   case Cmd(stmt: Stmt, state: State)
 
+/** A set of things that can go wrong during evaluation of an unchecked program. We then prove that
+  * these exceptions indeed do not happen if evaluation is preceded by a static check.
+  */
 enum LangException:
-  case _EmptyEnvStack
+  /** Internal interpreter exception to keep track of an empty scope stack exception. This should
+    * not happen and is later proven so.
+    */
+  case _EmptyScopeStack
 
   case UndeclaredVariable
   case RedeclaredVariable

@@ -23,9 +23,9 @@ object Interpreter {
           case (Left(b1), _)          => Left(b1)
           case (_, Left(b2))          => Left(b2)
       case Ident(name)       =>
-        if state.env.isEmpty then Left(Set(LangException._EmptyEnvStack))
+        if state.scopes.isEmpty then Left(Set(LangException._EmptyScopeStack))
         else
-          state.env.head.get(name) match
+          state.scopes.head.env.get(name) match
             case Some(loc) =>
               state.mem.get(loc) match
                 case Some(value) => Right(value)
@@ -33,24 +33,32 @@ object Interpreter {
             case None()    => Left(Set(LangException.UndeclaredVariable))
 
   def evalStmt1(stmt: Stmt, state: State, blocks: BigInt): Either[Set[LangException], Conf] = {
-    val State(env, mem, nl) = state
+    val State(scopes, mem, nl) = state
     stmt match
       case Decl(name, value) =>
-        if env.isEmpty then Left(Set(LangException._EmptyEnvStack))
+        if scopes.isEmpty then Left(Set(LangException._EmptyScopeStack))
         else
-          (env.head.contains(name), evalExpr(value, state)) match
+          (scopes.head.env.contains(name), evalExpr(value, state)) match
             case (false, Right(v)) =>
-              Right(St(State(env.head + (name -> nl) :: env.tail, mem + (nl -> v), nl + 1)))
+              Right(
+                St(
+                  State(
+                    Scope(scopes.head.env + (name -> nl), scopes.head.freed) :: scopes.tail,
+                    mem + (nl -> v),
+                    nl + 1
+                  )
+                )
+              )
             case (false, Left(b))  => Left(b)
             case (true, Right(v))  => Left(Set(LangException.RedeclaredVariable))
             case (true, Left(b))   => Left(b + LangException.RedeclaredVariable)
       case Assign(to, value) =>
-        if env.isEmpty then Left(Set(LangException._EmptyEnvStack))
+        if scopes.isEmpty then Left(Set(LangException._EmptyScopeStack))
         else
-          (env.head.get(to), evalExpr(value, state)) match
+          (scopes.head.env.get(to), evalExpr(value, state)) match
             case (Some(loc), Right(v)) =>
               mem.contains(loc) match
-                case true  => Right(St(State(env, mem.updated(loc, v), nl)))
+                case true  => Right(St(State(scopes, mem.updated(loc, v), nl)))
                 case false => Left(Set(LangException.InvalidLoc))
             case (Some(loc), Left(b))  =>
               mem.contains(loc) match
@@ -63,8 +71,8 @@ object Interpreter {
           case Left(b)  => Left(b)
           case Right(c) =>
             if c then
-              if env.isEmpty then Left(Set(LangException._EmptyEnvStack))
-              else Right(Cmd(_Block(body), State(env.head :: env, mem, nl)))
+              if scopes.isEmpty then Left(Set(LangException._EmptyScopeStack))
+              else Right(Cmd(_Block(body), State(scopes.head :: scopes, mem, nl)))
             else Right(St(state))
       case Seq(stmt1, stmt2) =>
         evalStmt1(stmt1, state, blocks) match
@@ -75,7 +83,7 @@ object Interpreter {
               case Cmd(nstmt1, nstate) => Right(Cmd(Seq(nstmt1, stmt2), nstate))
       case Free(name)        =>
         // TODO: implement Free
-        Right(St(State(env, mem, nl)))
+        Right(St(State(scopes, mem, nl)))
       case _Block(stmt0)     =>
         evalStmt1(stmt0, state, blocks + 1) match
           case Left(b)     => Left(b)
@@ -83,7 +91,7 @@ object Interpreter {
             conf match
               case St(nstate)          =>
                 val State(nenv, nmem, nnl) = nstate
-                if nenv.isEmpty then Left(Set(LangException._EmptyEnvStack))
+                if nenv.isEmpty then Left(Set(LangException._EmptyScopeStack))
                 else Right(St(State(nenv.tail, nmem, nnl)))
               case Cmd(nstmt0, nstate) => Right(Cmd(_Block(nstmt0), nstate))
   }
