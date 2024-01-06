@@ -29,6 +29,7 @@ object Checker {
         val (s1, menv) = stmtIsClosed(stmt1, env)
         val (s2, nenv) = stmtIsClosed(stmt2, menv)
         (s1 && s2, nenv)
+      case Free(name)        => (true, env)
       case _Block(stmt0)     =>
         val (b, _) = stmtIsClosed(stmt0, env)
         (b, env)
@@ -48,6 +49,7 @@ object Checker {
         val (s1, menv) = stmtHasNoRedeclarations(stmt1, env)
         val (s2, nenv) = stmtHasNoRedeclarations(stmt2, menv)
         (s1 && s2, nenv)
+      case Free(name)        => (true, env)
       case _Block(stmt0)     =>
         val (b, _) = stmtHasNoRedeclarations(stmt0, env)
         (b, env)
@@ -60,6 +62,7 @@ object Checker {
     case Assign(to, value) => true
     case If(cond, body)    => stmtHasNoBlocks(body)
     case Seq(stmt1, stmt2) => stmtHasNoBlocks(stmt1) && stmtHasNoBlocks(stmt2)
+    case Free(name)        => true
     case _Block(stmt0)     => false
 
 }

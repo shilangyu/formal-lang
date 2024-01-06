@@ -6,20 +6,24 @@ import stainless.lang.*
 
 type Loc = BigInt
 
-//type ExprVal = Boolean
 type Env = Map[Name, Loc]
-//type Mem = Map[Loc, ExprVal]
 type Mem = Map[Loc, Boolean]
 
-// Loc is the first free location
-type State = (List[Env], Mem, Loc)
+case class Scope(val env: Env, val freed: Set[Name])
+case class State(val scopes: List[Scope], val mem: Mem, val nextLoc: Loc)
 
 enum Conf:
   case St(state: State)
   case Cmd(stmt: Stmt, state: State)
 
+/** A set of things that can go wrong during evaluation of an unchecked program. We then prove that
+  * these exceptions indeed do not happen if evaluation is preceded by a static check.
+  */
 enum LangException:
-  case _EmptyEnvStack
+  /** Internal interpreter exception to keep track of an empty scope stack exception. This should
+    * not happen and is later proven so.
+    */
+  case _EmptyScopeStack
 
   case UndeclaredVariable
   case RedeclaredVariable
