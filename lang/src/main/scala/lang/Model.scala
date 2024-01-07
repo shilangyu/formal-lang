@@ -10,7 +10,7 @@ type Env = Map[Name, Loc]
 type Mem = Map[Loc, Boolean]
 
 case class Scope(val env: Env, val freed: Set[Name])
-case class State(val scopes: List[Scope], val mem: Mem, val nextLoc: Loc)
+case class State(val scopes: List[Scope], val mem: Mem, val freed: Set[Name], val nextLoc: Loc)
 
 enum Conf:
   case St(state: State)
@@ -29,6 +29,7 @@ enum LangException:
   case RedeclaredVariable
 
   case InvalidLoc
+  case UseAfterFree
 
 // ---
 

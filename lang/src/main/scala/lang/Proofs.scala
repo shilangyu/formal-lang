@@ -59,7 +59,32 @@ object Proofs {
         evalStmt1Consistency(stmt1, state, blocks)
       case _Block(stmt0)     =>
         evalStmt1Consistency(stmt0, state, blocks + 1)
-      case _                 => ()
+        Interpreter.evalStmt1(stmt0, state, blocks + 1) match
+          case Left(b)     => ()
+          case Right(conf) =>
+            conf match
+              case St(nstate)          =>
+                if nstate.scopes.isEmpty || nstate.scopes.tail.isEmpty then ()
+                else
+                  assert(blocks >= 0)
+                  assert(blocks + 2 == nstate.scopes.size)
+                  assert(blocks + 1 == nstate.scopes.tail.size)
+                  assert(
+                    envStackInclusion(
+                      nstate.scopes.head.env,
+                      nstate.scopes.tail
+                    )
+                  )
+                  assert(
+                    envStackInclusion(
+                      nstate.scopes.tail.head.env,
+                      nstate.scopes.tail.tail
+                    )
+                  )
+              case Cmd(nstmt0, nstate) =>
+                assert(stmtAndStateAreConsistent(nstmt0, nstate, blocks + 1))
+      case _                 =>
+        ()
   }.ensuring(
     Interpreter.evalStmt1(stmt, state, blocks) match
       case Left(_)     => true
@@ -67,6 +92,55 @@ object Proofs {
         conf match
           case St(nstate)         => stateIsConsistent(nstate, blocks)
           case Cmd(nstmt, nstate) => stmtAndStateAreConsistent(nstmt, nstate, blocks)
+  )
+
+  def noEmptyStackExpr(expr: Expr, state: State): Unit = {
+    require(state.scopes.nonEmpty)
+    expr match
+      case True              => ()
+      case False             => ()
+      case Nand(left, right) =>
+        noEmptyStackExpr(left, state)
+        noEmptyStackExpr(right, state)
+      case Ident(name)       => ()
+  }.ensuring(
+    Interpreter.evalExpr(expr, state) match
+      case Right(_)         => true
+      case Left(exceptions) => !exceptions.contains(LangException._EmptyScopeStack)
+  )
+
+  def noEmptyStackStmt(stmt: Stmt, state: State, blocks: BigInt): Unit = {
+    require(stmtAndStateAreConsistent(stmt, state, blocks))
+    evalStmt1Consistency(stmt, state, blocks)
+    stmt match
+      case Decl(name, value) =>
+        noEmptyStackExpr(value, state)
+      case Assign(to, value) =>
+        noEmptyStackExpr(value, state)
+      case If(cond, body)    =>
+        noEmptyStackExpr(cond, state)
+      case Seq(stmt1, stmt2) =>
+        noEmptyStackStmt(stmt1, state, blocks)
+      case Free(name)        =>
+        ()
+      case _Block(stmt0)     =>
+        noEmptyStackStmt(stmt0, state, blocks + 1)
+        evalStmt1Consistency(stmt0, state, blocks + 1)
+        Interpreter.evalStmt1(stmt0, state, blocks + 1) match
+          case Left(b)     =>
+            assert(!b.contains(LangException._EmptyScopeStack))
+            ()
+          case Right(conf) =>
+            conf match
+              case St(nstate)          =>
+                assert(nstate.scopes.size == blocks + 2)
+                assert(!nstate.scopes.isEmpty)
+                assert(!nstate.scopes.tail.isEmpty)
+              case Cmd(nstmt0, nstate) => ()
+  }.ensuring(
+    Interpreter.evalStmt1(stmt, state, blocks) match
+      case Right(conf)      => true
+      case Left(exceptions) => !exceptions.contains(LangException._EmptyScopeStack)
   )
 
   // ---
@@ -93,9 +167,7 @@ object Proofs {
     }.ensuring(
       Interpreter.evalExpr(expr, state) match
         case Right(_)         => true
-        case Left(exceptions) =>
-          !exceptions.contains(LangException.UndeclaredVariable)
-          && !exceptions.contains(LangException._EmptyScopeStack)
+        case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
     )
 
     def evalStmt1Aux(stmt: Stmt, state: State, blocks: BigInt): Unit = {
@@ -190,9 +262,7 @@ object Proofs {
     }.ensuring(
       Interpreter.evalStmt(stmt, state) match
         case Right(fstate)    => true
-        case Left(exceptions) =>
-          !exceptions.contains(LangException.UndeclaredVariable)
-          && !exceptions.contains(LangException._EmptyScopeStack)
+        case Left(exceptions) => !exceptions.contains(LangException.UndeclaredVariable)
     )
   }
 
@@ -213,9 +283,7 @@ object Proofs {
     }.ensuring(
       Interpreter.evalExpr(expr, state) match
         case Right(_)         => true
-        case Left(exceptions) =>
-          !exceptions.contains(LangException.RedeclaredVariable)
-          && !exceptions.contains(LangException._EmptyScopeStack)
+        case Left(exceptions) => !exceptions.contains(LangException.RedeclaredVariable)
     )
 
     def evalStmt1Aux(stmt: Stmt, state: State, blocks: BigInt): Unit = {
@@ -289,9 +357,7 @@ object Proofs {
             case Cmd(nstmt, nstate) =>
               stmtAndStateAreConsistent(nstmt, nstate, blocks)
               && Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.scopes.head.env))._1
-        case Left(exceptions) =>
-          !exceptions.contains(LangException.RedeclaredVariable)
-          && !exceptions.contains(LangException._EmptyScopeStack)
+        case Left(exceptions) => !exceptions.contains(LangException.RedeclaredVariable)
     )
 
     def noRedeclarationsStmtEval(stmt: Stmt, state: State): Unit = {
@@ -310,9 +376,7 @@ object Proofs {
     }.ensuring(
       Interpreter.evalStmt(stmt, state) match
         case Right(fstate)    => true
-        case Left(exceptions) =>
-          !exceptions.contains(LangException.RedeclaredVariable)
-          && !exceptions.contains(LangException._EmptyScopeStack)
+        case Left(exceptions) => !exceptions.contains(LangException.RedeclaredVariable)
     )
   }
 
@@ -354,7 +418,7 @@ object Proofs {
      * increase by one at every interpretation step. */
     def locIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val State(scopes, mem, loc) = state
+      val State(scopes, mem, freed, loc) = state
 
       require(!mem.contains(loc))
       stmt match
@@ -388,7 +452,7 @@ object Proofs {
     /* Loc increses by one with a declaration */
     def locIncreasesWithDecl(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val State(scopes, mem, loc) = state
+      val State(scopes, mem, freed, loc) = state
       stmt match
         case Decl(_, _)    =>
           Interpreter.evalStmt1(stmt, state, blocks) match
