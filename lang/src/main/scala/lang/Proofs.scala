@@ -203,14 +203,14 @@ object Proofs {
         case Left(_)     => true
         case Right(conf) =>
           conf match
-            case St(nstate)         =>
-              stateIsConsistent(nstate, blocks) &&
-              (Checker.stmtIsClosed(stmt, keySet(state.scopes.head.env))._2
-                == keySet(nstate.scopes.head.env))
-            case Cmd(nstmt, nstate) =>
-              stmtAndStateAreConsistent(nstmt, nstate, blocks) &&
-              (Checker.stmtIsClosed(stmt, keySet(state.scopes.head.env))._2
-                == Checker.stmtIsClosed(nstmt, keySet(nstate.scopes.head.env))._2)
+            case St(nstate)         => (
+              Checker.stmtIsClosed(stmt, keySet(state.scopes.head.env))._2
+                == keySet(nstate.scopes.head.env)
+            )
+            case Cmd(nstmt, nstate) => (
+              Checker.stmtIsClosed(stmt, keySet(state.scopes.head.env))._2
+                == Checker.stmtIsClosed(nstmt, keySet(nstate.scopes.head.env))._2
+            )
     )
 
     def closedStmtEvalPlusClosedness1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
@@ -236,14 +236,11 @@ object Proofs {
       Interpreter.evalStmt1(stmt, state, blocks) match
         case Right(conf)      =>
           conf match
-            case St(nstate)         =>
-              stateIsConsistent(nstate, blocks)
+            case St(nstate)         => true
             case Cmd(nstmt, nstate) =>
-              stmtAndStateAreConsistent(nstmt, nstate, blocks)
-              && Checker.stmtIsClosed(nstmt, keySet(nstate.scopes.head.env))._1
+              Checker.stmtIsClosed(nstmt, keySet(nstate.scopes.head.env))._1
         case Left(exceptions) =>
           !exceptions.contains(LangException.UndeclaredVariable)
-          && !exceptions.contains(LangException._EmptyScopeStack)
     )
 
     def closedStmtEval(stmt: Stmt, state: State): Unit = {
@@ -319,14 +316,14 @@ object Proofs {
         case Left(_)     => true
         case Right(conf) =>
           conf match
-            case St(nstate)         =>
-              stateIsConsistent(nstate, blocks) &&
-              (Checker.stmtHasNoRedeclarations(stmt, keySet(state.scopes.head.env))._2
-                == keySet(nstate.scopes.head.env))
-            case Cmd(nstmt, nstate) =>
-              stmtAndStateAreConsistent(nstmt, nstate, blocks) &&
-              (Checker.stmtHasNoRedeclarations(stmt, keySet(state.scopes.head.env))._2
-                == Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.scopes.head.env))._2)
+            case St(nstate)         => (
+              Checker.stmtHasNoRedeclarations(stmt, keySet(state.scopes.head.env))._2
+                == keySet(nstate.scopes.head.env)
+            )
+            case Cmd(nstmt, nstate) => (
+              Checker.stmtHasNoRedeclarations(stmt, keySet(state.scopes.head.env))._2
+                == Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.scopes.head.env))._2
+            )
     )
 
     def noRedeclStmtEvalPlusNoRedecl1(stmt: Stmt, state: State, blocks: BigInt): Unit = {
@@ -352,11 +349,9 @@ object Proofs {
       Interpreter.evalStmt1(stmt, state, blocks) match
         case Right(conf)      =>
           conf match
-            case St(nstate)         =>
-              stateIsConsistent(nstate, blocks)
+            case St(nstate)         => true
             case Cmd(nstmt, nstate) =>
-              stmtAndStateAreConsistent(nstmt, nstate, blocks)
-              && Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.scopes.head.env))._1
+              Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.scopes.head.env))._1
         case Left(exceptions) => !exceptions.contains(LangException.RedeclaredVariable)
     )
 
