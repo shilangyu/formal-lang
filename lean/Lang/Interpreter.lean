@@ -79,3 +79,6 @@ def evalStmt (stmt : Stmt) (env : Env) (mem : Memory) (h : isTypeCheckedStmt stm
     EvalResult.mk newer.newEnv newer.newMem (by
       simp only [typeCheckStmt, new.sameEnv, newer.sameEnv]
     )
+
+def evalProgram (stmt : Stmt) (h : isTypeCheckedStmt stmt Finset.empty) : EvalResult stmt (List.toAList []) :=
+  evalStmt stmt (List.toAList []) (List.toAList []) h

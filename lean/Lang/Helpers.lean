@@ -8,13 +8,13 @@ import Mathlib.Data.Finset.Basic
 This module stores helper lemmas, functions, utils, etc.
 -/
 
-/-! ## Functions -/
+/-! ## Definitions -/
 
 instance AListToString [Repr α] [∀ a, Repr (β a)] : ToString (@AList α β) where
   toString l := "{" ++ (l.entries |> List.map (fun e => s!"{reprStr e.fst}: {reprStr e.snd}") |> String.intercalate ", ") ++ "}"
 
 /-- Returns a finite set of keys of an association list. -/
-def keySet {α : Type} {β : α → Type} (a : @AList α β) : Finset α :=
+def keySet {α : Type} {β : α → Type} (a : AList β) : Finset α :=
   Finset.mk (Multiset.ofList a.keys) a.nodupKeys
 
 /-- Given a proof that key ∈ assocList, lookups the key without fail. -/
@@ -52,12 +52,11 @@ def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ as
     · simp only [true_and, *]
       apply Option.some_eq_some.mp h.symm
     · case _ ht =>
-      simp only [ht, false_and]
-      assumption
+      contradiction
   · intro h
     split
     · apply Option.some_eq_some.mpr h.2.symm
-    · simp [*] at h
+    · case _ ht => exact ht h.1
 
 @[simp] lemma Option.isNone_false_isSome : Option.isNone o = false ↔ Option.isSome o := by
   cases o <;> simp only [isNone_none, isSome_none, isNone_some, isSome_some]

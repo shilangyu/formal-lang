@@ -3,8 +3,6 @@ import Lang
 
 def isTypeCheckedProgram := (isTypeCheckedStmt · Finset.empty)
 
-def evalProgram := (evalStmt · (List.toAList []) (List.toAList []))
-
 
 def main : IO Unit := do
   let program := Stmt.seq (Stmt.decl (Name.mk "myVar1") Expr.true) (Stmt.conditional Expr.false (Stmt.decl (Name.mk "myVar2") Expr.false))
