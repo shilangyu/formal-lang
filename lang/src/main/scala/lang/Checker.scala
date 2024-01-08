@@ -1,44 +1,65 @@
 package lang
 
 import stainless.*
-import stainless.lang.*
 import stainless.collection.*
+import stainless.lang.*
 
 import Expr.*
 import Stmt.*
 
 object Checker {
 
-  // Check if there are access to undeclared variables
-  def isExprClosed(expr: Expr, names: Set[Name]): Boolean = expr match {
-    case True               => true
-    case False              => true
-    case Nand(left, right)  => isExprClosed(left, names) && isExprClosed(right, names)
-    case Ident(name)        => names.contains(name)
-    //case Ref(e)             => isExprClosed(e, env)
-    //case Deref(e)           => isExprClosed(e, env)
+  def exprIsClosed(expr: Expr, env: Set[Name]): Boolean = expr match {
+    case True              => true
+    case False             => true
+    case Nand(left, right) =>
+      exprIsClosed(left, env) && exprIsClosed(right, env)
+    case Ident(name)       => env.contains(name)
   }
 
-  // Check if there are access to undeclared variables
-  def isStmtClosed(stmt: Stmt, names: Set[Name]): (Boolean, Set[Name]) =
+  def stmtIsClosed(stmt: Stmt, env: Set[Name]): (Boolean, Set[Name]) =
     stmt match {
-    case Decl(name, value)  => (isExprClosed(value, names), names + name)
-    case Assign(to, value)  => (names.contains(to) && isExprClosed(value, names), names)
-    case If(cond, body)     =>
-      val (c, _) = isStmtClosed(body, names)
-      (isExprClosed(cond, names) && c, names)
-    //case While(cond, body)  =>
-    //  val (b, nenv) = isStmtClosed(body, env)
-    //  (isExprClosed(cond, env) && b, nenv)
-    case Seq(s1, s2)        =>
-      val (c1, mnames) = isStmtClosed(s1, names)
-      val (c2, fnames) = isStmtClosed(s2, mnames)
-      (c1 && c2, fnames)
-    //case Block(s)           => isClosed(s,envs.head::envs) 
-    //case Swap(e1, e2)       => isExprClosed(e1, envs.head) && isExprClosed(e2, envs.head)
-    //case Bye(n)             => envs.head.contains(n)
-  }
+      case Decl(name, value) => (exprIsClosed(value, env), env + name)
+      case Assign(to, value) =>
+        (env.contains(to) && exprIsClosed(value, env), env)
+      case If(cond, body)    =>
+        val (b, _) = stmtIsClosed(body, env)
+        (exprIsClosed(cond, env) && b, env)
+      case Seq(stmt1, stmt2) =>
+        val (s1, menv) = stmtIsClosed(stmt1, env)
+        val (s2, nenv) = stmtIsClosed(stmt2, menv)
+        (s1 && s2, nenv)
+      case Free(name)        => (env.contains(name), env)
+      case _Block(stmt0)     =>
+        val (b, _) = stmtIsClosed(stmt0, env)
+        (b, env)
+    }
 
-  def isProgClosed(prog: Stmt): (Boolean, Set[Name]) =
-    isStmtClosed(prog, Set.empty)
+  def stmtHasNoRedeclarations(stmt: Stmt, env: Set[Name]): (Boolean, Set[Name]) =
+    stmt match {
+      case Decl(name, value) => (!env.contains(name), env + name)
+      case Assign(to, value) => (true, env)
+      case If(cond, body)    =>
+        val (b, _) = stmtHasNoRedeclarations(body, env)
+        (b, env)
+      case Seq(stmt1, stmt2) =>
+        val (s1, menv) = stmtHasNoRedeclarations(stmt1, env)
+        val (s2, nenv) = stmtHasNoRedeclarations(stmt2, menv)
+        (s1 && s2, nenv)
+      case Free(name)        => (true, env)
+      case _Block(stmt0)     =>
+        val (b, _) = stmtHasNoRedeclarations(stmt0, env)
+        (b, env)
+    }
+
+  // ---
+
+  def stmtHasNoBlocks(stmt: Stmt): Boolean = stmt match
+    case Decl(name, value) => true
+    case Assign(to, value) => true
+    case If(cond, body)    => stmtHasNoBlocks(body)
+    case Seq(stmt1, stmt2) => stmtHasNoBlocks(stmt1) && stmtHasNoBlocks(stmt2)
+    case Free(name)        => true
+    case _Block(stmt0)     => false
+
 }
