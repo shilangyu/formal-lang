@@ -204,7 +204,9 @@ object Proofs {
           closedExprEval(cond, state)
         case Seq(stmt1, stmt2) =>
           closedStmtEval1(stmt1, state, blocks)
-        case Free(name)        => ()
+        case Free(name)        =>
+          keySetPost(state.envs.head, name)
+          assert(state.envs.head.contains(name))
         case _Block(stmt0)     =>
           closedStmtEval1(stmt0, state, blocks + 1)
     }.ensuring(
@@ -227,7 +229,7 @@ object Proofs {
           conf match
             case St(nstate)         => true
             case Cmd(nstmt, nstate) =>
-              Checker.stmtIsClosed(nstmt, keySet(nstate.envs.head))._1
+              nstate.envs.size > 0 && Checker.stmtIsClosed(nstmt, keySet(nstate.envs.head))._1
         case Left(exceptions) => true
     )
 
@@ -284,6 +286,7 @@ object Proofs {
       stmt match
         case Decl(name, value) =>
           noRedeclarationsExprEval(value, state)
+          keySetPost(state.envs.head, name)
         case Assign(to, value) =>
           noRedeclarationsExprEval(value, state)
           keySetPost(state.envs.head, to)
@@ -291,9 +294,31 @@ object Proofs {
           noRedeclarationsExprEval(cond, state)
         case Seq(stmt1, stmt2) =>
           noRedeclarationsStmtEval1(stmt1, state, blocks)
-        case Free(name)        => ()
+          evalStmt1Consistency(stmt1, state, blocks)
+          Interpreter.evalStmt1(stmt1, state, blocks) match
+            case Left(content) => ()
+            case Right(conf)   =>
+              conf match
+                case St(nstate)          =>
+                  assert(stateIsConsistent(nstate, blocks))
+                case Cmd(nstmt1, nstate) =>
+                  assert(stmtAndStateAreConsistent(nstmt1, nstate, blocks))
+        case Free(name)        =>
+          keySetPost(state.envs.head, name)
         case _Block(stmt0)     =>
           noRedeclarationsStmtEval1(stmt0, state, blocks + 1)
+          evalStmt1Consistency(stmt0, state, blocks + 1)
+          Interpreter.evalStmt1(stmt0, state, blocks + 1) match
+            case Left(content) => assert(!content.contains(LangException.RedeclaredVariable))
+            case Right(conf)   =>
+              conf match
+                case St(nstate)          =>
+                  assert(stateIsConsistent(nstate, blocks + 1))
+                  assert(nstate.envs.size == blocks + 2)
+                  assert(nstate.envs.tail.size == blocks + 1)
+                  assert(envStackInclusion(nstate.envs.tail.head, nstate.envs.tail.tail))
+                case Cmd(nstmt0, nstate) =>
+                  assert(stmtAndStateAreConsistent(nstmt0, nstate, blocks + 1))
     }.ensuring(
       Interpreter.evalStmt1(stmt, state, blocks) match
         case Right(conf)      => true
@@ -315,6 +340,7 @@ object Proofs {
           conf match
             case St(nstate)         => true
             case Cmd(nstmt, nstate) =>
+              nstate.envs.size > 0 &&
               Checker.stmtHasNoRedeclarations(nstmt, keySet(nstate.envs.head))._1
         case Left(exceptions) => true
     )

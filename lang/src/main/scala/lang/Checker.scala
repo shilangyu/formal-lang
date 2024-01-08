@@ -35,9 +35,6 @@ object Checker {
         (b, env)
     }
 
-  def progIsClosed(prog: Stmt): (Boolean, Set[Name]) =
-    stmtIsClosed(prog, Set.empty)
-
   def stmtHasNoRedeclarations(stmt: Stmt, env: Set[Name]): (Boolean, Set[Name]) =
     stmt match {
       case Decl(name, value) => (!env.contains(name), env + name)
