@@ -1,0 +1,17 @@
+# vscode
+.vscode/ 
+.bsp/
+.metals/
+project/metals.sbt
+
+# bloop
+.bloop/
+project/.bloop/
+
+# sbt
+target/
+project/target/
+project/project/
+
+# stainless
+.stainless-cache
