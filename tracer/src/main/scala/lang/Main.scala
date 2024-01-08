@@ -3,8 +3,7 @@ package lang
 import Expr.*
 import Stmt.*
 
-
-@main def main() = { 
+@main def main() = {
   /*
   val env: Env = Map()
   val envs: List[Env] = List(env)
@@ -24,5 +23,5 @@ import Stmt.*
 
   val r2: Boolean = Interpreter.evalExpr(p2, state2)
   println(s"Result: $r2")     // false
-  */
+   */
 }.ensuring(true)
