@@ -14,11 +14,11 @@ instance AListToString [Repr α] [∀ a, Repr (β a)] : ToString (@AList α β) 
   toString l := "{" ++ (l.entries |> List.map (fun e => s!"{reprStr e.fst}: {reprStr e.snd}") |> String.intercalate ", ") ++ "}"
 
 /-- Returns a finite set of keys of an association list. -/
-def keySet {α : Type} {β : α → Type} (a : AList β) : Finset α :=
+@[simp] def keySet {α : Type} {β : α → Type} (a : AList β) : Finset α :=
   Finset.mk (Multiset.ofList a.keys) a.nodupKeys
 
 /-- Given a proof that key ∈ assocList, lookups the key without fail. -/
-def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ assocList) : β key :=
+@[simp] def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ assocList) : β key :=
   have isSome : (assocList.lookup key).isSome := by exact AList.lookup_isSome.mpr h
 
   match assocList.lookup key, isSome with
@@ -58,5 +58,21 @@ def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ as
     · apply Option.some_eq_some.mpr h.2.symm
     · case _ ht => exact ht h.1
 
+@[simp] lemma Option.eqSome_else {p : Prop} {_ : Decidable p} : (if p then none else some v) = some t ↔ ¬p ∧ t = v := by
+  apply Iff.intro
+  · intro h
+    split at h
+    · contradiction
+    · case _ ht =>
+      simp only [ht, not_false_eq_true, true_and]
+      apply Option.some_eq_some.mp h.symm
+  · intro h
+    split
+    · case _ ht => exact h.1 ht
+    · apply Option.some_eq_some.mpr h.2.symm
+
 @[simp] lemma Option.isNone_false_isSome : Option.isNone o = false ↔ Option.isSome o := by
   cases o <;> simp only [isNone_none, isSome_none, isNone_some, isSome_some]
+
+@[simp] lemma AList.insert_set_preservation {α : Type} {_ : DecidableEq α} {β : α → Type} {map : AList β} {key : α} {value : β key} : Insert.insert key (keySet map) = keySet (AList.insert key value map) := by
+  sorry

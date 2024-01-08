@@ -8,7 +8,7 @@ Simple bump allocator which manages Locs and their underlying memory. We prove p
 
 /-! ## Definitions -/
 
-/-- A memory location represented as a natural number. Basically a newtype. -/
+/-- A memory location represented as a natural number. Basically a newtype of Nat. -/
 structure Loc where
   loc : Nat
 deriving Repr, DecidableEq
