@@ -9,8 +9,8 @@ type Loc = BigInt
 type Env = Map[Name, Loc]
 type Mem = Map[Loc, Boolean]
 
-case class Scope(val env: Env, val freed: Set[Name])
-case class State(val scopes: List[Scope], val mem: Mem, val nextLoc: Loc)
+//case class Scope(val env: Env, val freed: Set[Name])
+case class State(val envs: List[Env], val mem: Mem, val nextLoc: Loc)
 
 enum Conf:
   case St(state: State)
