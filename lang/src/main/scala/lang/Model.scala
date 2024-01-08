@@ -9,8 +9,7 @@ type Loc = BigInt
 type Env = Map[Name, Loc]
 type Mem = Map[Loc, Boolean]
 
-case class Scope(val env: Env, val freed: Set[Name])
-case class State(val scopes: List[Scope], val mem: Mem, val nextLoc: Loc)
+case class State(val envs: List[Env], val mem: Mem, val nextLoc: Loc)
 
 enum Conf:
   case St(state: State)
@@ -20,10 +19,10 @@ enum Conf:
   * these exceptions indeed do not happen if evaluation is preceded by a static check.
   */
 enum LangException:
-  /** Internal interpreter exception to keep track of an empty scope stack exception. This should
-    * not happen and is later proven so.
+  /** Internal interpreter exception to keep track of an empty env stack exception. This should not
+    * happen and is later proven so.
     */
-  case _EmptyScopeStack
+  case _EmptyEnvStack
 
   case UndeclaredVariable
   case RedeclaredVariable
@@ -31,6 +30,7 @@ enum LangException:
   case InvalidLoc
 
 // ---
+// Some axiomatized properties to relate a map and a set.
 
 import stainless.annotation.{extern, pure}
 

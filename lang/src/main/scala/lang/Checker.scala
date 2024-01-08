@@ -29,14 +29,11 @@ object Checker {
         val (s1, menv) = stmtIsClosed(stmt1, env)
         val (s2, nenv) = stmtIsClosed(stmt2, menv)
         (s1 && s2, nenv)
-      case Free(name)        => (true, env)
+      case Free(name)        => (env.contains(name), env)
       case _Block(stmt0)     =>
         val (b, _) = stmtIsClosed(stmt0, env)
         (b, env)
     }
-
-  def progIsClosed(prog: Stmt): (Boolean, Set[Name]) =
-    stmtIsClosed(prog, Set.empty)
 
   def stmtHasNoRedeclarations(stmt: Stmt, env: Set[Name]): (Boolean, Set[Name]) =
     stmt match {
