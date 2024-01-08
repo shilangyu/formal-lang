@@ -19,10 +19,10 @@ enum Conf:
   * these exceptions indeed do not happen if evaluation is preceded by a static check.
   */
 enum LangException:
-  /** Internal interpreter exception to keep track of an empty scope stack exception. This should
-    * not happen and is later proven so.
+  /** Internal interpreter exception to keep track of an empty env stack exception. This should not
+    * happen and is later proven so.
     */
-  case _EmptyScopeStack
+  case _EmptyEnvStack
 
   case UndeclaredVariable
   case RedeclaredVariable
@@ -30,6 +30,7 @@ enum LangException:
   case InvalidLoc
 
 // ---
+// Some axiomatized properties to relate a map and a set.
 
 import stainless.annotation.{extern, pure}
 

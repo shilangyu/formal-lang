@@ -23,7 +23,7 @@ object Interpreter {
           case (Left(b1), _)          => Left(b1)
           case (_, Left(b2))          => Left(b2)
       case Ident(name)       =>
-        if state.envs.isEmpty then Left(Set(LangException._EmptyScopeStack))
+        if state.envs.isEmpty then Left(Set(LangException._EmptyEnvStack))
         else
           state.envs.head.get(name) match
             case Some(loc) =>
@@ -36,7 +36,7 @@ object Interpreter {
     val State(envs, mem, nl) = state
     stmt match
       case Decl(name, value) =>
-        if envs.isEmpty then Left(Set(LangException._EmptyScopeStack))
+        if envs.isEmpty then Left(Set(LangException._EmptyEnvStack))
         else
           (envs.head.contains(name), evalExpr(value, state)) match
             case (false, Right(v)) =>
@@ -53,7 +53,7 @@ object Interpreter {
             case (true, Right(v))  => Left(Set(LangException.RedeclaredVariable))
             case (true, Left(b))   => Left(b + LangException.RedeclaredVariable)
       case Assign(to, value) =>
-        if envs.isEmpty then Left(Set(LangException._EmptyScopeStack))
+        if envs.isEmpty then Left(Set(LangException._EmptyEnvStack))
         else
           (envs.head.get(to), evalExpr(value, state)) match
             case (Some(loc), Right(v)) =>
@@ -71,7 +71,7 @@ object Interpreter {
           case Left(b)  => Left(b)
           case Right(c) =>
             if c then
-              if envs.isEmpty then Left(Set(LangException._EmptyScopeStack))
+              if envs.isEmpty then Left(Set(LangException._EmptyEnvStack))
               else Right(Cmd(_Block(body), State(envs.head :: envs, mem, nl)))
             else Right(St(state))
       case Seq(stmt1, stmt2) =>
@@ -82,7 +82,7 @@ object Interpreter {
               case St(nstate)          => Right(Cmd(stmt2, nstate))
               case Cmd(nstmt1, nstate) => Right(Cmd(Seq(nstmt1, stmt2), nstate))
       case Free(name)        =>
-        if envs.isEmpty then Left(Set(LangException._EmptyScopeStack))
+        if envs.isEmpty then Left(Set(LangException._EmptyEnvStack))
         else
           envs.head.get(name) match
             case Some(loc) =>
@@ -97,7 +97,7 @@ object Interpreter {
             conf match
               case St(nstate)          =>
                 val State(nenv, nmem, nnl) = nstate
-                if nenv.isEmpty then Left(Set(LangException._EmptyScopeStack))
+                if nenv.isEmpty then Left(Set(LangException._EmptyEnvStack))
                 else Right(St(State(nenv.tail, nmem, nnl)))
               case Cmd(nstmt0, nstate) => Right(Cmd(_Block(nstmt0), nstate))
   }
