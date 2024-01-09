@@ -1,0 +1,21 @@
+\section{Approach}
+
+As mentioned already, in this project we intend to formally prove properties on the \textit{implementation} of the language rather than on some abstract model of it, which is the usual practice.
+
+When we talk about the \textit{implementation} of a language, we usually refer to an interpreter program that implements its operational semantics. The interpreter takes as input a representation of a valid program and executes it on a virtual machine: applies the sequence of state changes on the virtual machine given by the program statements. In this framework, proving properties on the implementation of a language, and subsequently on the language itself, translates to proving properties about the execution of valid programs on the virtual machine by the interpreter. As a by-product, we can also obtain guarantees about the correctness of the implementation of the interpreter.
+
+The validity of the program supplied to the interpreter is crucial. It is precisely this assumption that provides the evidence needed to prove the properties of its execution.
+
+\vspace{0.6cm}
+
+Our approach for this project has been to implement an interpreter for the presented language and then to prove that the execution of any valid program by such interpreter enjoys some properties.
+
+\noindent More precisely,
+
+An instance of a program in our language is represented by an abstract syntax tree, which is just a complex recursive data-structure. The definition of the AST model admits the construction of invalid programs.
+
+The validity of a given program is determined by the checker or validation procedure, which ensures that the program adheres to the specification. The checker also provides additional information that is convenient for the proofs.
+
+The language interpreter takes as input a program and executes it on the virtual machine. The execution can either terminate successfully or be aborted by an exception. Exceptions signal the reachability of some incorrect state of the virtual machine, which should not have been reached. All the exceptions reflect the violation of some of the properties that we want to prove, but not all the properties have an exception associated.
+
+With this, our goal is to prove that given that a program is valid, the execution of this program by the interpreter enjoys the desired properties: no exceptions are thrown, or other properties.

@@ -1,0 +1,56 @@
+% For adding code blocks
+\definecolor{keywordcolor}{rgb}{0.7, 0.1, 0.1}   % red
+\definecolor{tacticcolor}{rgb}{0.0, 0.1, 0.6}    % blue
+\definecolor{commentcolor}{rgb}{0.4, 0.4, 0.4}   % grey
+\definecolor{symbolcolor}{rgb}{0.0, 0.1, 0.6}    % blue
+\definecolor{sortcolor}{rgb}{0.1, 0.5, 0.1}      % green
+\definecolor{attributecolor}{rgb}{0.7, 0.1, 0.1} % red
+\def\lstlanguagefiles{lstlean.tex}
+\lstdefinelanguage{Toy}{
+  keywords={free, let, if, while},
+  ndkeywords={true, false},
+  sensitive=false,
+  comment=[l]{\#},
+  basicstyle=\tt\normalsize,
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywordstyle=\color{magenta}\bfseries,
+  identifierstyle=\color{black},
+  commentstyle=\color{darkgray},
+  rulecolor=\color{black},
+}
+
+% Merged from http://tihlde.org/~eivindw/latex-listings-for-scala/ and 
+% http://lampsvn.epfl.ch/trac/scala/export/26099/scala-tool-support/trunk/src/latex/scaladoc.sty
+% "define" Scala
+%Keyword list taken from the scaladoc definition.
+\lstdefinelanguage{scala}{
+  morekeywords={%
+      abstract,case,catch,class,def,do,else,enum,extends,%
+      false,final,finally,for,forSome,if,implicit,import,lazy,%
+      match,new,null,object,override,package,private,protected,%
+      return,sealed,super,this,throw,trait,true,try,type,%
+      val,var,while,with,yield},
+  otherkeywords={=>,<-,<\%,<:,>:,\#,@},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[n]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]',
+  morestring=[b]"""
+}[keywords,comments,strings]
+
+\lstset{
+  language=Toy,
+  breaklines=true,
+  numberstyle=\tiny\color{black},
+  escapechar=@,
+  frame = single,
+  captionpos=b,
+}
+
+
+
+% notes
+\FXRegisterAuthor{gb}{anguillem}{\color{orange} {\underline{guillem}}}
+\FXRegisterAuthor{fs}{anfranco}{\color{teal} {\underline{franco}}}
+\FXRegisterAuthor{mw}{anmarcin}{\color{magenta} {\underline{marcin}}}

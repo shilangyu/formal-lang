@@ -1,0 +1,402 @@
+\section{Implementation}
+
+When starting the project many challenges were quickly identified. There were two big decisions to be made at the very start:
+
+\begin{enumerate}
+  \item Do we want to complete the project in Stainless or in a more manual theorem prover?
+  \item What implementation of the interpreter do we use, a big-step-like or a small-step-like?
+\end{enumerate}
+
+The first question was related to the amount of control we wanted in the proofs. Stainless is incredible at proving things that can be easily seen to be true saving a lot of time. On the other hand interactive theorem provers usually require a lot more manual labor to show even the simplest facts. But on the flip side relying on Stainless' inference can be detrimental once Stainless no longer can see a fact. Familiar with Stainless, we opted for using the tool we know best.
+
+The second question concerns itself with which implementation will be easier to prove properties about. We quickly noticed that having the \texttt{While} construct in the language meant that an interpreter that tries to evaluate the whole program at once (big-step-like) would be non terminating. We thought this would lead to big complications so we chose to pursue the small-step-like interpreter.
+
+Even though we had chosen the path we want to pursue, due to hitting many hard blockers on the way we kept experimenting with two alternative paths with hopes of getting further with them. Considering many hours were spent on the alternative implementations, we want to outline them here to contrast the various approaches and then contrast them in Sec. \ref{sec:conclusions}.
+
+The whole source code is stored on \href{https://github.com/shilangyu/formal-lang}{GitHub}.
+
+\subsection{Lean}
+
+Lean is a functional programming language that can be used also as an interactive theorem prover. Similarly to a different popular theorem prover, Coq, Lean is based on the \textit{Calculus of Constructions}. Mathlib\cite{mathlib} was used to provide foundation of structures such as finite sets and association lists. The Lean implementation can be found on \href{https://github.com/shilangyu/formal-lang/tree/main/lean/Lang}{GitHub} with the following files:
+
+\begin{itemize}
+  \item \href{https://github.com/shilangyu/formal-lang/tree/main/lean/Lang/Allocator.lean}{\texttt{Allocator.lean}} Simple bump allocator which manages Locs and their underlying memory.
+  \item \href{https://github.com/shilangyu/formal-lang/tree/main/lean/Lang/Ast.lean}{\texttt{Ast.lean}} This module defines the abstract syntax tree of the language.
+  \item \href{https://github.com/shilangyu/formal-lang/tree/main/lean/Lang/Checker.lean}{\texttt{Checker.lean}} This module focuses on static properties of a program. Meaning, the analysis that can be performed on source code without actually evaluating it.
+  \item \href{https://github.com/shilangyu/formal-lang/tree/main/lean/Lang/Helpers.lean}{\texttt{Helpers.lean}} This module stores helper lemmas, functions, utils, etc.
+  \item \href{https://github.com/shilangyu/formal-lang/tree/main/lean/Lang/Interpreter.lean}{\texttt{Interpreter.lean}} This module performs evaluation of the source code. It evaluates an AST given a proof that the type checker has accepted this AST.
+\end{itemize}
+
+\subsubsection{Structures}
+
+\begin{figure}[!h]
+  \begin{minipage}{0.53\textwidth}
+    \centering
+    \begin{lstlisting}[language=lean,caption={AST structures defined in Lean},label={lst:lean-ast},frame=none]
+structure Name where
+  name : String
+
+inductive Expr where
+  | true
+  | false
+  | nand (left right : Expr)
+  | ident (name : Name)
+
+inductive Stmt where
+  | decl (name : Name) (value : Expr)
+  | assign (target : Name) (value : Expr)
+  | conditional (condition : Expr) (body : Stmt)
+  | while (condition : Expr) (body : Stmt)
+  | seq (left right : Stmt)
+  | free (name : Name)
+\end{lstlisting}
+  \end{minipage}
+  \begin{minipage}{0.47\textwidth}
+    \centering
+    \begin{lstlisting}[language=lean,caption={Definition of models in Lean},label={lst:lean-model},frame=none,escapechar=*]
+/-- A memory location represented as a natural number. Basically a newtype over Nat. -/
+structure Loc where
+  loc : Nat
+
+/-- The memory maps variable locations to values. -/
+abbrev Memory := @AList Loc (fun _ => Bool)
+
+/-- The environment maps variable names to memory locations. -/
+abbrev Env := @AList Name (fun _ => Loc)
+
+/-- A set of freed variables. -/
+abbrev Freed := Finset Name
+\end{lstlisting}
+  \end{minipage}
+\end{figure}
+
+The AST definition (Lst. \ref{lst:lean-ast}) follows a standard format. There is a separation between expressions and statements, and Name is a new type to not be confused with a string.
+
+Then follow definitions (Lst. \ref{lst:lean-model}) of the model structures needed to reason about the state of the interpreter. We use an association list to represent partial maps. Keys of an association list are unique, and thus form a finite set. This relation is important when relating the checker and the interpreter (to be discussed shortly).
+
+\subsubsection{Checker}
+
+\begin{lstlisting}[language=lean,caption={The checker for a FormalLang program. \texttt{typeCheckStmt} shortened to only show handling of declarations.},label={lst:lean-checker},frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+/-- Returns true if the expression is well-formed. -/
+def typeCheckExpr (expr : Expr) (vars : Variables) : Bool :=
+    match expr with
+    | Expr.true => Bool.true
+    | Expr.false => Bool.true
+    | Expr.nand left right => (typeCheckExpr left vars) && (typeCheckExpr right vars)
+    | Expr.ident name => name ∈ vars
+
+def typeCheckStmt (stmt : Stmt) (vars : Variables) : Option Variables :=
+    match stmt with
+    | Stmt.decl name value =>
+        if name ∉ vars then
+          let newVar := insert name vars
+          if typeCheckExpr value vars then
+            some newVar
+          else
+            none
+        else none
+    -- ...
+
+/-- The assertion that `typeCheckStmt` accepted the input, ie it is not `none`. -/
+def isTypeCheckedStmt (stmt : Stmt) (vars : Variables) := (typeCheckStmt stmt vars).isSome
+\end{lstlisting}
+
+The checker is a function which traverses each node of the AST once to verify some static properties of a program. Since a checker is not concerned with allocation, it does not keep track of memory nor of any locations. Therefore the \texttt{Variables} (Lst. \ref{lst:lean-checker}) it keeps track of is merely a finite set of names. The checker module additionally defines the \texttt{isClosedStmt} and \texttt{hasNoRedeclarations} properties, which are in fact just the subset of things being checked by the larger \texttt{typeCheckStmt}. The rest of the module defines many useful lemmas (for instance, given that \texttt{Stmt.decl} has been accepted by the checker, we know that \texttt{Stmt.decl.value} has also been accepted by the checker) and concludes with two larger ones: being accepted by the checker implies that the program is closed and has no redeclarations. To produce such a proof we first need to prove that the \texttt{Variables} being tracked by the checker and the properties are the same. This is needed when stepping through \texttt{Stmt.seq}. Once we know the tracked variables are indeed the same, it trivially follows that if the checker accepts some input then so will the properties.
+
+\subsubsection{Interpreter}
+
+The checker module does not need to know anything about the interpreter for the checker only reasons about static properties. However, the converse is not true. For the interpreter to execute correctly, it must have a guarantee that the checker has accepted the input.
+
+
+\begin{lstlisting}[language=lean,caption={The interpreter. Evaluates structures given proofs of correctness. Cut for brevity.},label={lst:lean-interpreter},frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+/-- Entries in env have allocated memory. -/
+def hasValidLocs (env : Env) (mem : Memory) := ∀ name, ∀ loc, env.lookup name = some loc → loc ∈ mem
+
+/-- Describes the result of evaluating a statement. Contains the resulting state as well as proofs for invariants. -/
+structure EvalResult (stmt : Stmt) (env : Env) where
+  newEnv : Env
+  newMem : Memory
+  -- proof that the env tracked by the type checker and the interpreter is the same
+  sameEnv : typeCheckStmt stmt (keySet env) = some (keySet newEnv)
+  -- proof that all items in env have entries in mem
+  validLocs : hasValidLocs newEnv newMem
+
+/-- Evaluates an expression given a proof that the type checker has accepted this input. -/
+def evalExpr
+  (expr : Expr) (env : Env) (mem : Memory)
+  (h : typeCheckExpr expr (keySet env)) (validLocs : hasValidLocs env mem)
+  : Bool := match expr with
+   -- ...
+   | Expr.ident name =>
+    let loc := AList.get name env (typeCheckExpr_ident h)
+    let val := AList.get loc mem (by
+      have p : AList.lookup name env = some loc := by
+        simp_all only [AList.get, Option.isSome_some]
+        split
+        simp_all only [Option.some.injEq, Option.isSome_some, heq_eq_eq]
+      have q := validLocs name loc
+
+      simp_all only [AList.get, Option.isSome_some, forall_true_left]
+    )
+    val
+
+def evalStmt
+  (stmt : Stmt) (env : Env) (mem : Memory)
+  (h : isTypeCheckedStmt stmt (keySet env)) (validLocs : hasValidLocs env mem)
+  : EvalResult stmt env := match stmt with
+   -- ...
+\end{lstlisting}
+
+The interpreter (Lst. \ref{lst:lean-interpreter}) receives as input the AST, the environment, and the memory, but also proofs of correctness. The most important input proof is being accepted by the checker. This allows the interpreter to formally prove lack of some runtime errors. For instance, since we know the input is closed, we know that when evaluating \texttt{Expr.ident} we know that this identifier exists in the environment. This is visible in the listing as \texttt{AList.get name env (typeCheckExpr_ident h)}, where we get an element from the environment by providing a proof that it is indeed there. This proof is deduced by a lemma based on \texttt{h}, the proof that the input has been accepted by the checker.
+
+The interpreter also has to inductively produce proofs when stepping through the AST. As visible in \texttt{EvalResult}, the interpreter maintains proofs such as:
+
+\begin{itemize}
+  \item The key set of the environment is the same as the one computed by the type checker. This equality is again needed when stepping through \texttt{Stmt.seq}.
+  \item All values in the environment are valid keys to the memory, as expressed by the proposition \texttt{hasValidLocs}. This is of course needed whenever dereferencing memory to make sure the memory entry is actually there. This can be seen being in a proof when accessing the memory to compute \lstinline[language=lean]{let val}.
+\end{itemize}
+
+As one can see, while the interpreter is not necessarily a terminating functions, due to the evaluation of such constructs as \texttt{While}, it is a pure one. The result will be always computed without any errors being encountered on the way.
+
+When new variables are declared they go through an allocator, which mimics a bump allocator. It looks at the current environment and takes the maximum of $env[\text{Names}]$ and adds one, yielding a unique location. At that location a new memory cells is added to maintain \texttt{hasValidLocs}.
+
+\subsubsection{Implementation status}
+
+The implemention has all language constructs except \texttt{Free} which does not actually perform freeing. Not all properties were proven. This implementation not being the primary focus, while still a lot of time, had less time spent on it. Closedness (Sec. \ref{sec:properties-closedness}) and lack of redeclarations (Sec. \ref{sec:properties-noredecl}) have been fully proven. Unique ownership (Sec. \ref{sec:properties-uniqown}) was not started, but the idea would be simple: given that only \texttt{Stmt.decl} alters the environment, we can derive unique ownership from the fact that the allocator returns a location that is not used by any variable. Use-after-free (Sec. \ref{sec:properties-useafterfree}) was not even attempted due to lack of a full \texttt{Free} implementation. Finally, no dangling pointers (Sec. \ref{sec:properties-danglingptr}) has a partial implementation with missing steps but with code comments about how the proof should be continued.
+
+%\gbnote{review}
+
+\subsection{Stainless}
+
+As previously indicated, we have implemented both an interpreter and a tracer in Scala. The interpreter follows a big-step operational semantics, executing the entire program in a single step by recursively traversing the abstract syntax tree representation. In contrast, the tracer employs a small-step operational semantics, executing one interpretation step at a time and returning the pair next statement and updated state.
+
+The code is available on \href{https://github.com/shilangyu/formal-lang/tree/main/lang/src/main/scala/lang}{GitHub} has the following identical structure for both implementations:
+
+\begin{itemize}
+  \item \href{https://github.com/shilangyu/formal-lang/blob/main/lang/src/main/scala/lang/AST.scala}{\texttt{AST.scala}} defines the abstract syntax tree.
+  \item \href{https://github.com/shilangyu/formal-lang/blob/main/lang/src/main/scala/lang/Model.scala}{\texttt{Model.scala}} defines the state model, including memory and environment, along with FormalLang exceptions.
+  \item \href{https://github.com/shilangyu/formal-lang/blob/main/lang/src/main/scala/lang/Interpreter.scala}{\texttt{Interpreter.scala}} contains the implementation of the interpreter.
+  \item \href{https://github.com/shilangyu/formal-lang/blob/main/lang/src/main/scala/lang/Checker.scala}{\texttt{Checker.scala}} contains the implementation of the checker.
+  \item \href{https://github.com/shilangyu/formal-lang/blob/main/lang/src/main/scala/lang/Proofs.scala}{\texttt{Proofs.scala}} contains the Stainless proofs.
+\end{itemize}
+
+
+\subsubsection{Structures}
+
+\begin{figure}[!h]
+  \begin{minipage}{0.46\textwidth}
+    \centering
+    \begin{lstlisting}[language=scala, caption={AST structures defined in Scala},label={lst:scala-ast},frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+type Name = String
+
+enum Expr {
+  case True
+  case False
+  case Nand(val left: Expr, val right: Expr)
+  case Ident(val name: Name)
+}
+
+enum Stmt {
+  case Decl(val name: Name, val value: Expr)
+  case Assign(val to: Name, val value: Expr)
+  case If(val cond: Expr, val body: Stmt)
+  
+  case Seq(val stmt1: Stmt, val stmt2: Stmt)
+  case Free(val name: Name)
+
+  case _Block(val stmt: Stmt)  // Tracer
+}
+\end{lstlisting}
+  \end{minipage}
+  \begin{minipage}{0.54\textwidth}
+    \centering
+    \begin{lstlisting}[language=Scala, caption={Definition of models in Scala},label={lst:scala-model},frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+
+type Loc = BigInt
+type Env = Map[Name, Loc]
+type Mem = Map[Loc, Boolean]
+
+// --- Interpreter ---
+case class State(val env: Env, val mem: Mem, val nextLoc: Loc)
+
+// --- Tracer ---
+case class State(val envs: List[Env], val mem: Mem, val nextLoc: Loc)
+enum Conf:
+  case St(state: State)
+  case Cmd(stmt: Stmt, state: State)
+
+\end{lstlisting}
+  \end{minipage}
+\end{figure}
+
+
+The AST \ref{lst:scala-ast} is defined by means of two algebraic data types, one for expressions and one for statements. \texttt{_Block} is a special statement used internally by the tracer and cannot be used to construct programs. The model \ref{lst:scala-model} defines the types and structures needed to reason about the state of the interpreter and the tracer. The environment and the memory are standard Stainless maps. The state of the interpreter uses a single environment whereas that of the tracer uses a stack of environments. Additionally, the tracer defines another algebraic data type for the two kinds of configurations handled in its logic.
+
+\noindent\rule{0.3\textwidth}{.4pt}
+
+Much like for Lean, in our proofs we need to reason about sets and maps and their sets of keys. Stainless offers limited interoperability between these abstractions, so we had to add some convenient operations and define some axioms on them.
+
+\textit{For instance, we have defined the operation \texttt{keySet} that takes a map and returns its set of keys. Then we have defined the following axiom: if a given set $S$ is equals to the set of keys of a given map $M$, then the set obtained by adding some value $k$ to $S$ is equal to the set of keys of the map obtained by adding some pair $k \rightarrow v$ to $M$.}
+
+
+% Comment on limited interoperability maps and sets, important for checker <-> interpreter
+% Had to add functions and axioms
+
+\subsubsection{Exception handling}
+
+The following are the exceptions (\texttt{LangException}) that can be thrown by the interpreter or the tracer:
+
+\begin{itemize}
+  \item \texttt{UndeclaredVariable}: Occurs when attempting to access a variable that has not been declared within the environment;
+  \item \texttt{RedeclaredVariable}: Occurs when a variable is declared using an identifier that is already present in the existing environment;
+  \item \texttt{InvalidLoc}: Occurs when attempting to access a memory location that is not defined in memory.
+
+  \item \textit{\texttt{_EmptyEnvStack}: Special exception used by the tracer. Occurs when attempting to access an empty stack of environments.}
+\end{itemize}
+
+To avoid throwing exceptions in Scala, which are hard to manage with Stainless, the various interpretation functions are defined to return either a set of exceptions or the actual result of the execution. We use the Stainless either, as follows: \texttt{Either[Set[LangException], T]}
+
+% MENTION SOMEWHERE: In order to avoid throwing exceptions in Stainless, we modelled the exceptions as another interpretation result. The interpretation functions we defined return either a set of exceptions or the actual result of the execution.
+
+\subsubsection{Checker}
+
+The checker consists of a set of functions that traverse the AST once to verify some static properties of the program. Much like for Lean, these are not concerned with allocation, so they do not keep track of memory nor of any locations. A program is deemed valid only when it successfully passes all these checks.
+
+\begin{figure}[H]
+  \begin{minipage}{0.45\textwidth}
+    \centering
+    \begin{lstlisting}[language=Scala, caption={Expression closedness check},label={lst:scala-ecl},frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+  def exprIsClosed(expr: Expr, env: Set[Name]): Boolean = expr match {
+    case True              => true
+    case False             => true
+    case Nand(left, right) =>
+      exprIsClosed(left, env) && exprIsClosed(right, env)
+    case Ident(name)       => env.contains(name)
+  }
+\end{lstlisting}
+  \end{minipage}%
+  \centering
+  \begin{minipage}{0.55\textwidth}
+    \centering
+    \begin{lstlisting}[language=Scala, caption={Statement closedness check},label={lst:scala-scl},frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+def stmtIsClosed(stmt: Stmt, env: Set[Name]): (Boolean, Set[Name]) =
+stmt match {
+  case Decl(name, value) => (exprIsClosed(value, env), env + name)
+  case Assign(to, value) =>
+    (env.contains(to) && exprIsClosed(value, env), env)
+  case If(cond, body)    =>
+    val (b, _) = stmtIsClosed(body, env)
+    (exprIsClosed(cond, env) && b, env)
+  case Seq(stmt1, stmt2) =>
+    val (s1, menv) = stmtIsClosed(stmt1, env)
+    val (s2, nenv) = stmtIsClosed(stmt2, menv)
+    (s1 && s2, nenv)
+  case Free(name)        => (env.contains(name), env)
+  // --- Tracer ---
+  case _Block(stmt0)     =>
+    val (b, _) = stmtIsClosed(stmt0, env)
+    (b, env)
+}
+\end{lstlisting}
+  \end{minipage}
+\end{figure}
+
+The functions \ref{lst:scala-ecl} and \ref{lst:scala-scl} verify, respectively, that the given expression or statement is closed. Similarly, \texttt{stmtHasNoRedeclarations} verifies that the given statement does not contain redeclarations, or \texttt{stmtHasNoBlocks} that does not contain blocks.
+
+\subsubsection{Interpreter}
+
+The interpreter is a function that, given as input the program and the initial state, executes the entire program and returns the final state.
+
+\begin{lstlisting}[language=Scala,frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+def evalExpr(expr: Expr, state: State): Either[Set[LangException], Boolean]
+
+def evalStmt(stmt: Stmt, state: State): Either[Set[LangException], State]
+\end{lstlisting}
+
+It traverses the program tree once, modifying and/or propagating the current state to and from recursive calls, and short-circuiting when an exception is "thrown".
+
+\subsubsection{Interpreter implementation status}
+
+The interpreter is the first implementation we tackled, but we soon focused our efforts on the other two. Hence, it is the least developed of the three. The implementation supports all of the language constructs except \texttt{While}. This interpreter is the most similar in \textit{form} (i.e. traversal, shape, logic, etc.) to the checker, so all indications are that it would produce the simplest proofs for our properties. However, almost none of the properties have been proved due to the main attention on the other implementations.
+
+Closedness \ref{sec:properties-closedness} is the only property that has been proved. It has a fairly simple inductive proof with a small difficulty. Both the checker and the interpreter check/execute both statements of a \texttt{Seq}, passing some results of the first call to the second. To prove closedness we need to prove the lemma that these two intermediate objects, i.e. the set of names and the state, are consistent.
+
+\begin{figure}[H]
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \begin{lstlisting}[language=Scala,frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+case Seq(stmt1, stmt2) =>
+  val (c1, mnames) = isStmtClosed(stmt1, names)
+  val (c2, fnames) = isStmtClosed(stmt2, mnames)
+  (c1 && c2, fnames)
+\end{lstlisting}
+  \end{minipage}%
+  \centering
+  \begin{minipage}{0.52\textwidth}
+    \centering
+    \begin{lstlisting}[language=Scala,frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+case Seq(stmt1, stmt2) =>          
+  evalStmt(stmt1, state) match
+    case Left(excep)   => Left(excep) 
+    case Right(mstate) => evalStmt(stmt2, mstate) match
+      case Left(excep)   => Left(excep) 
+      case Right(fstate) => Right(fstate)
+\end{lstlisting}
+  \end{minipage}
+\end{figure}
+
+
+\begin{center}
+  \texttt{Seq} case, checker on the left and interpreter on the right.
+\end{center}
+
+\subsubsection{Tracer}
+
+Given a program, the tracer executes it statement by statement, going through a trace of states. The tracer consists of two functions: \texttt{evalStmt1} and \texttt{evalStmt}. The former executes a single step of computation, returning the updated state, while the latter invokes \texttt{evalStmt1} recursively.
+
+\begin{lstlisting}[language=Scala,frame=none,escapechar=*,basicstyle=\tt\scriptsize]
+def evalExpr(expr: Expr, state: State): Either[Set[LangException], Boolean]
+
+def evalStmt1(stmt: Stmt, state: State, blocks: BigInt): Either[Set[LangException], Conf]
+def evalStmt(stmt: Stmt, state: State): Either[Set[LangException], State]
+\end{lstlisting}
+
+We opted to implement the tracer to attain fine-grained control over the execution process. For instance, when confronted with infinite while statements, the big-step interpreter enters in a non-terminating state. In contrast, the tracer, with its function that executes a single statement and returns the subsequent state, ensures termination even in such scenarios.
+
+For this reasons, the focal point of interest is on reason about properties of \texttt{evalStmt1}.
+
+To enable the tracer's functionality, we introduce several changes and additions to the virtual model\ref{lst:scala-model}. One prominent adjustment involves the evolution of the state tuple's environment tracking. It transforms from a single environment to a stack of environments implemented as a list. This modification proves crucial for managing scopes, as seen in if and while bodies where the environment atop the stack needs to be discarded to eliminate variables declared within it. To manage the environment stack, we introduced a 'synthetic' block in the AST \ref{lst:scala-ast}. This block, not derivable from a program written in concrete syntax, is exclusively employed by the tracer for scope management. Another significant addition is the \texttt{Conf} type, that represents either a state or a pair composed of a statement and a state. Additionally, the function \texttt{evalStmt1} includes a new parameter that tracks the number of open blocks.
+
+\subsubsection{Tracer implementation status}
+
+The majority of our efforts were dedicated to implementing and verifying the tracer, which proved to be the most challenging path of the three. Initially, we anticipated a smoother process due to the increased control we had; however, the difference in \textit{form} (i.e. traversal, shape, logic, etc.) between the checker and the tracer made it difficult to effectively utilizing the evidence provided by the checker in our proofs.
+
+% TOPROCESS: small step interpreter modifies the program and outputs the next step, effectively storing some state in the same program in the form of Blocks which represents open scopes be popped in the future. additionally, it uses stack of environments instead of just one, and this is linked to the blocks appearing in the program. First we undertook the task of proving various properties to ensure the correct operation of the tracer with respect of the state and the modifications aplied to the program. IDJKDJKDJFJKHASJHfauy
+
+The small-step interpreter processes the program and outputs the next step and the state, effectively storing some state in the form of Blocks, which represents open scopes to be popped when the block will be closed. Additionally, it utilizes a more complex model involving the stack of environments. First we undertook the task of proving various properties to ensure the correct operation of the tracer with respect of the enhanced state and modifications applied to the program.
+These included establishing the monotonicity of the stack of environments with regards to the subset relation (ensuring that all elements from the previous environment in the stack are present in the current one), verifying the non-emptiness of the stack of environments, and ensuring consistency between the number of blocks and environments in the stack.
+
+As the interpreter, the tracer supports all of the language constructs except \texttt{While}.
+
+Given a program and a state, the execution of a single step of the tracer results in the next program and state in the sequence. Therefore, the program is changing at each step. Given the evidence from the checker, we can easily prove Closedness\ref{sec:properties-closedness} for a single step of computation.
+Since the checker is only applied to the initial program, we only have this evidence and can therefore apply the proof for the first step of the sequence. After that, the program has changed, so we no longer have the evidence we need. Therefore, in order to prove Closedness\ref{sec:properties-closedness} for the entire execution of the program (i.e. all steps of the tracer), we need to prove that the evidence initially given by the checker is preserved at each step of the computation. In this way we can inductively apply the above proof to prove the subsequent goal.
+
+Most of the effort devoted to the tracer has been focused on proving this preservation lemma. At one point, we thought we had a proof for it, but we discovered a mutual recursion error in the proof that we overlooked because we had termination checking turned off due to other problems. Because of the very different nature of the checker and the tracer, it has proven extremely difficult to reconcile the evidence provided by the checker with our proofs. Ultimately, we have decided to state it as an axiom, hoping to prove it in the future.
+
+A similar story is the absence of redeclarations \ref{sec:properties-noredecl}. But this time we opted to directly state preservation as an axiom, recognizing the complexity involved.
+
+Unique ownership \ref{sec:properties-uniqown} was also attempted. As opposed to other properties, its proof does not depend on evidence supplied by the checker but solely on the operation of the tracer. But it is again a preservation property, of the injectiveness of the environment. Progress has been made toward a first lemma that states that the allocator location is fresh (i.e., it is different from all locations in the environment/state), but it is not finished.
+
+Finally, use-after-free \ref{sec:properties-useafterfree} and no dangling pointers \ref{sec:properties-danglingptr} were not attempted because we prioritized proving preservation lemmas, plus \texttt{Free} was added to this implementation relatively late.
+
+% Btw, do we even mention what we have not proven? Marcin does it
+% You mean regarding the original goal? Regarding use-after-free and no dangling pointers ( the two other props)
+
+% ALMOST DONE
+% Do you want to say something about Unique ownership?
+% Not sure ... just that is was attempted
+
+
+% Unique ownership was also attempted, but it is again a preservation property so FUCk
+
+% Termination OK except for 3 VC?

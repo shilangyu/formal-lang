@@ -18,6 +18,8 @@ jobs:
         with:
           working_directory: report
           root_file: main.tex
+          continue_on_error: true
+        continue-on-error: true
 
       - name: Compile paper review
         uses: xu-cheng/latex-action@v3

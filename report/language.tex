@@ -1,0 +1,129 @@
+\section{Language}
+
+We introduce FormalLang, a programming language for which we will develop an interpreter in subsequent sections. This language is designed to prioritize correctness of its execution, exhibiting intentional minimalism in its features. Notably, it exclusively employs a singular data type—boolean—and relies solely on the functionally complete NAND ($\uparrow$) operator. Since we are not interested in type properties we find the boolean type satisfatory. It is crucial to emphasize that, at this preliminary stage, the language is intentionally unsuitable for real-world applications. Despite this limitation, it serves as a foundational starting point crucial to achieving the project's overarching goal: the formal verification of properties associated with FormalLang. We provide a code snippet to exemplify a valid program written in FormalLang (Lst. \ref{lst:formallang-example}).
+
+\begin{figure}[!h]
+    \begin{minipage}{0.6\textwidth}
+        \centering
+        \begin{lstlisting}[caption={Program snippet written in FormalLang.},label={lst:formallang-example},frame=none]
+let myVar = true
+let other = false
+
+if other @$\uparrow$@ other {
+    myVar := myVar @$\uparrow$@ other
+    free other
+}
+
+while myVar {
+    let p = myVar @$\uparrow$@ true
+    myVar := p @$\uparrow$@ (p @$\uparrow$@ p)
+}
+\end{lstlisting}
+    \end{minipage}
+    \begin{minipage}{0.4\textwidth}
+        \centering
+        \begin{grammar}
+            <expr> ::= true | false \hfill \texttt{Bool}
+            \alt <expr>$_1$ $\uparrow$ <expr>$_2$ \hfill \texttt{Nand}
+            \alt <name> \hfill \texttt{Ident}
+            \alt (<expr>) \hfill \texttt{Group}
+
+            <stmt> ::= let <name> = <expr> \hfill \texttt{Decl}
+            \alt <name> := <expr> \hfill \texttt{Assign}
+            \alt if <expr> \{ <stmt> \} \hfill \texttt{If}
+            \alt while <expr> \{ <stmt> \} \hfill \texttt{While}
+            \alt free <name> \hfill \texttt{Free}
+            \alt <stmt>$_1$ <stmt>$_2$ \hfill \texttt{Seq}
+        \end{grammar}
+        \caption{Grammar of FormalLang expressed in BNF-like syntax.}
+        \label{fig:formallang-grammar}
+    \end{minipage}
+\end{figure}
+
+As evident in the code snippet, variables are declared by specifying an expression, and the resulting evaluated value serves as the initialized value for the variable. The language further supports the mutation variables, if and while statements, and the freeing of variables from memory. The formal grammar (Fig. \ref{fig:formallang-grammar}), is subsequently provided for comprehensive understanding.
+
+\subsection{Operational Semantics}
+
+\subsubsection{Virtual Model}
+
+In our virtual model, we define a state represented by a tuple. This tuple comprises the essential components of the system, including the environment ($\text{env}$), the set of freed variables ($\text{freed}$), the memory ($\text{mem}$), and the next free location in memory ($l$)
+
+Formally, the components are defined as follows:
+
+\begin{itemize}
+    \item The environment is a mapping from variable names to locations
+          $$\text{env}: \text{Names} \to \text{Locs}$$
+    \item The set of freed variables is a subset of variable names
+          $$\text{freed} \subseteq \text{Names}$$
+    \item The memory is a mapping from locations to boolean values
+          $$\text{mem}: \text{Locs} \to \text{Bool}$$
+    \item The next free location is an element of the set of locations
+          $$l \in \text{Locs}$$
+    \item The state itself is defined as a tuple
+          $$\text{state} = (\text{env}, \text{freed}, \text{mem}, l)$$
+\end{itemize}
+
+We now state the operational semantics in big-step.
+
+\subsubsection{Expressions}
+
+\begin{mathpar}
+
+    \inferrule[True]
+    {}
+    {\langle \text{True}, \text{state} \rangle \mapsto_v \textbf{true} }
+
+    \inferrule[False]
+    {}
+    {\langle \text{False}, \text{state} \rangle \mapsto_v \textbf{false}}
+
+    \inferrule[Nand]
+    {\langle e_1, \text{state} \rangle \mapsto_v v_1 \quad \langle e_2, \text{state} \rangle \mapsto_v v_2}
+    {\langle e_1 \uparrow e_2, \text{state} \rangle \mapsto_v v_1 \uparrow v_2}
+
+    \inferrule[Ident]
+    {X \in \text{dom}(\text{env}) \quad \text{env}(X) \in \text{dom}(\text{mem})}
+    {\langle X, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_v \text{mem}(\text{env}(X))}
+
+\end{mathpar}
+
+\subsubsection{Statements}
+
+\begin{mathpar}
+
+    \inferrule[Decl]
+    {X \notin \text{dom}(\text{env}) \quad \langle e, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{v} v}
+    {\langle \text{let } X = e, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{s} (\text{env}\{l/X\}, \text{freed}, \text{mem}\{v/l\}, l+1)}
+
+    \inferrule[Assign]
+    {X \in \text{dom}(\text{env}) \quad \text{env}(X) \in \text{dom}(\text{mem}) \quad X \notin \text{freed} \quad \langle e, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{v} v}
+    {\langle X := e, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{s} (\text{env}, \text{freed}, \text{mem}\{v/\text{env}(X)\}, l)}
+
+    \inferrule[If-true]
+    {\langle e, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{v} \textbf{true} \quad \langle s, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{s} (\text{env}', \text{freed}', \text{mem}', l')}
+    {\langle \text{if} \; e \; \{ s \}, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{s} (\text{env}, \text{freed}', \text{mem}', l')}
+
+    \inferrule[If-false]
+    {\langle e, \text{state} \rangle \mapsto_{v} \textbf{false}}
+    {\langle \text{if} \; e \; \{ s \}, \text{state} \rangle \mapsto_{s} \text{state}}
+
+    \inferrule[While-True]
+    {\langle e, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{v} \textbf{true} \quad \langle s, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{s} (\text{env}', \text{freed}', \text{mem}', l') \\ \langle \text{while} \; e \; \{s\}, (\text{env}, \text{freed}', \text{mem}', l') \rangle \mapsto_s (\text{env}'', \text{freed}'', \text{mem}'', l'')}
+    {\langle \text{while} \; e \; \{ s \}, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{s} (\text{env}, \text{freed}'', \text{mem}'', l'')}
+
+    \inferrule[While-False]
+    {\langle e, \text{state} \rangle \mapsto_{v} \textbf{false}}
+    {\langle \text{while} \; e \; \{ s \}, \text{state} \rangle \mapsto_{s} \text{state}}
+
+    \inferrule[Seq]
+    {\langle s_1, \text{state} \rangle \mapsto_s \text{state}' \quad \langle s_2, \text{state}' \rangle \mapsto_s \text{state}''}
+    {\langle s_1 \; s_2, \text{state} \rangle \mapsto_{s} \text{state}''}
+
+    \inferrule[Free]
+    {X \in \text{dom}(\text{env}) \quad X \notin \text{freed}}
+    {\langle \text{free} \; X, (\text{env}, \text{freed}, \text{mem}, l) \rangle \mapsto_{s} (\text{env}, \text{freed}\cup \{X\}, \text{mem} \setminus \{\text{env}(X)\}, l)}
+\end{mathpar}
+
+Here, we denote $map\{y/x\}$ the extension of $map$ with a new mapping from $x$ to $y$.
+
+Notice how exiting an if statement drops the environment but keeps the information about the freed variables and the changed memory. This implies two semantics: variables have (lexical) scopes and the other feature will become more apparent in the checker, which will have to conservatively assume the condition is true and assume the variable was freed.

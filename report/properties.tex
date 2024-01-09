@@ -1,0 +1,78 @@
+\section{Properties}\label{sec:properties}
+
+Using the abstract model we define on it properties that we wish to prove about the language. A few properties are needed for general correctness of execution while others are for providing some guarantees which we are interested in.
+
+\subsection{Closedness}\label{sec:properties-closedness}
+
+Names of all variable accesses exist in the current environment.
+
+\begin{definition}[Closedness]
+    A program is closed if whenever evaluating $\texttt{Ident}\langle \text{name} \rangle$, $\texttt{Assign}\langle \text{name}, \text{expr} \rangle$, or $\texttt{Free}\langle \text{name} \rangle$ then $env(\text{name})$ is defined.
+\end{definition}
+
+\begin{lstlisting}
+var1 := true # error
+if var2 { # error
+}
+free var3 # error
+\end{lstlisting}
+
+This ensures that all identifiers we use point to declared variables existing within the current scope.
+
+\subsection{No redeclarations}\label{sec:properties-noredecl}
+
+A declaration cannot declare an already declared name.
+
+\begin{definition}[No redeclarations]
+    A program has no redeclarations if whenever evaluating $\texttt{Decl}\langle \text{name}, \text{expr} \rangle$ then $env(\text{name})$ is not defined.
+\end{definition}
+
+\begin{lstlisting}
+let var = true
+let var = false # error
+if true {
+    let var = false # error
+}
+\end{lstlisting}
+
+This ensures that variables cannot be shadowed. This property was introduced to simplify reasoning about the environment.
+
+\subsection{Unique ownership}\label{sec:properties-uniqown}
+
+No two variables in the environment point to the same location.
+
+\begin{definition}[Unique ownership]
+    A program exhibits unique ownership when $env$ is injective at all times.
+\end{definition}
+
+This has no snippet to show violation as this property cannot be actually exhibited in code. This property is useful for ensuring that a free construct will not create dangling pointers: if there were two names pointing to the same location, freeing one of the variables would invalidate both variables. But since we only track frees of the variables to which the free construct was applied to, we are unable to reason about such cases. Thus we need to make sure that applying free to a variable will not affect any other variables.
+
+\subsection{No use-after-free}\label{sec:properties-useafterfree}
+
+If a variable has been freed, we can no longer use it.
+
+\begin{definition}[No use-after-free]
+    A program has no uses-after-free if whenever evaluating $\texttt{Ident}\langle \text{name} \rangle$, $\texttt{Assign}\langle \text{name}, \text{expr} \rangle$, or $\texttt{Free}\langle \text{name} \rangle$ then $\text{name} \notin freed$.
+\end{definition}
+
+\begin{lstlisting}
+let var = true
+free var
+var := true # error
+let bar = true
+if false {
+    free bar
+}
+bar := true # error
+\end{lstlisting}
+
+\subsection{No dangling pointers}\label{sec:properties-danglingptr}
+
+If a variable has not been freed then it has a valid memory address.
+
+\begin{definition}[No dangling pointers]
+    A program has no dangling pointers if whenever evaluating $\texttt{Ident}\langle \text{name} \rangle$, $\texttt{Assign}\langle \text{name}, \text{expr} \rangle$, or $\texttt{Free}\langle \text{name} \rangle$ and $\text{name} \notin freed$ then $mem(env(\text{name}))$ is defined.
+\end{definition}
+
+
+This ensures that when we evaluate a valid identifier we can be certain that it points to a valid memory address. We restrict the definition to non-freed variables as freed ones no longer point to valid memory addresses.
