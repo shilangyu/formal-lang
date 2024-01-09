@@ -13,13 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile report
-        uses: xu-cheng/latex-action@v3
-        with:
-          working_directory: report
-          root_file: main.tex
-          continue_on_error: true
-        continue-on-error: true
+      # works on overleaf but not locally
+      # - name: Compile report
+      #   uses: xu-cheng/latex-action@v3
+      #   with:
+      #     working_directory: report
+      #     root_file: main.tex
 
       - name: Compile paper review
         uses: xu-cheng/latex-action@v3

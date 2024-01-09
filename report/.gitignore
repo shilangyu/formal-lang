@@ -20,6 +20,3 @@
 *.blg
 *.bbl
 *.run.xml
-
-# output pdf
-*.pdf
