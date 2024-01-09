@@ -1,0 +1,15 @@
+\section{Conclusions}\label{sec:conclusions}
+
+In this project we defined a language and its semantics, defined a set of properties, and finally presented our approach to deriving correctness guarantees. We operated on a real implementation of that language rather than on an abstract definition of it.
+
+\subsection{Differences in approaches}
+
+We explored various approaches which we wish to now contrast. As mentioned at the beginning of the implementation section, the two most important differences were the choice of tool and interpretation style.
+
+With Lean we enjoyed the fast development-feedback cycle where while writing proofs we are informed about whether the proof step is correct and what is the current goal to prove immediately. The proofs are precise so we do not have to worry about some potential nondeterministic factors. This is much different than our experience with Stainless, where we often encountered proofs being seen as valid tricking us into believing the proof is good enough. But after the cache is invalidated or cleared, our unchanged proof is no longer seen as valid. Fixing that required either hoping that eventually if left running for long enough Stainless would see it as valid once again, or debugging which exact condition is not easy to see for Stainless to then sprinkle some \texttt{assert}s to help Stainless see the condition indeed holds. This lead to losing trust in the cache and disabling it in favor of proofs that are more explicit to have them consistently being proven by Stainless. Combined with requiring a long time to give feedback about the proof correctness resulted in a very time consuming development cycle. On the other hand, Stainless was much more pleasant with its incredible power to prove all sorts of theorems without much of our help. In Lean that did not happen, and even the simplest properties needed a tedious proof.
+
+The other difference is using a big-step and small-step style interpreter. The former is easier to define and to relate it to the checker, which is also written in a big-step style. However, as mentioned previously, it suffers from being non-terminating and thus conducting proofs on it end up potentially being non-terminating as well. These kind of proofs are rejected. The small-step style interpreter is more complicated, for instance requiring the usage of a stack of environments, and thus results in more complicated proofs. For the tracer many lemmas had to be proven about consistency and the relation with the checker before any interesting properties can be tackled.
+
+\subsection{Future work}
+
+Other than fully completing the goals that has been set, the language could be always extended with new constructs. The nature of requiring formal proofs of the implementation will force a careful design to see how a feature interacts with all properties. Finally more properties can be added, such as lack of memory leaks which the current operational semantics do not guarantee (leaving an if-statement drops the environment but keeps the memory causing a leak).
