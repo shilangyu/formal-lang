@@ -22,5 +22,5 @@ inductive Stmt where
   | conditional (condition : Expr) (body : Stmt)
   | while (condition : Expr) (body : Stmt)
   | seq (left right : Stmt)
-  -- | bye (ref : Name)
+  | free (name : Name)
 deriving Repr

@@ -36,6 +36,7 @@ def typeCheckStmt (stmt : Stmt) (vars : Variables) : Option Variables := match s
   | Stmt.seq left right => match typeCheckStmt left vars with
     | some vars => typeCheckStmt right vars
     | none => none
+  | Stmt.free name => if name ∈ vars then some vars else none
 
 /-- The assertion that `typeCheckStmt` accepted the input, ie it is not `none`. -/
 def isTypeCheckedStmt (stmt : Stmt) (vars : Variables) := (typeCheckStmt stmt vars).isSome
@@ -64,6 +65,7 @@ where
     | Stmt.seq left right => match aux left vars with
       | some vars => aux right vars
       | none => none
+    | Stmt.free name => if name ∈ vars then some vars else none
 
 /-- A statement has no redeclarations if each declaration uses a unique name. -/
 def hasNoRedeclarations (stmt : Stmt) (vars : Variables) : Bool := (aux stmt vars).isSome
@@ -80,6 +82,7 @@ where
     | Stmt.seq left right => match aux left vars with
       | some vars => aux right vars
       | none => none
+    | Stmt.free _ => some vars
 
 /-! ## Proofs -/
 
@@ -185,6 +188,14 @@ lemma typeCheckStmt_seqRight (h : isTypeCheckedStmt (Stmt.seq left right) vars) 
     assumption
   · simp only [Option.isSome_none] at h
 
+/-- If Stmt.free is type checked, then the name exists in the `vars` set. -/
+lemma typeCheckStmt_freeNameExists (h : isTypeCheckedStmt (Stmt.free name) vars) : name ∈ vars := by
+  rw [isTypeCheckedStmt] at h
+  unfold typeCheckStmt at h
+  by_cases hn : name ∈ vars
+  · assumption
+  · simp only [hn, ite_false, Option.isSome_none, decide_False, Bool.false_and] at h
+
 /-- Given that the type checker accepts the expression, we know that the expression is closed. -/
 theorem typeCheckExpr_isClosedExpr (h : typeCheckExpr expr vars) : (isClosedExpr expr vars) := match expr with
   | Expr.true => by
@@ -265,6 +276,12 @@ lemma typeCheckStmt_vars_eq_isClosedStmt (h : isTypeCheckedStmt stmt vars) : typ
 
         simp only [hu ▸ hq, h]
       · simp only [Option.isSome_none] at h
+  | Stmt.free name => by
+      unfold isTypeCheckedStmt at h
+      unfold typeCheckStmt at h
+      unfold typeCheckStmt
+      unfold isClosedStmt.aux
+      rfl
 decreasing_by sorry -- TODO: no clue how to prove termination
 
 
@@ -333,6 +350,15 @@ theorem typeCheckStmt_vars_eq_hasNoRedeclarations (h : isTypeCheckedStmt stmt va
 
         simp only [hu ▸ hq, h]
       · simp only [Option.isSome_none] at h
+    | Stmt.free name => by
+      unfold isTypeCheckedStmt at h
+      unfold typeCheckStmt at h
+      unfold typeCheckStmt
+      unfold hasNoRedeclarations.aux
+      have t := Option.isSome_if.mp h
+      apply Option.eqSome_if.mpr
+      simp only [and_true]
+      exact t
 decreasing_by sorry -- TODO: no idea how to prove termination
 
 
