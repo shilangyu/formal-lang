@@ -3,6 +3,7 @@ import Mathlib.Data.List.AList
 import Mathlib.Data.Finset.Basic
 import Lang.Checker
 import Lang.Helpers
+import Lang.Allocator
 
 /-!
 # Interpreter
@@ -11,15 +12,8 @@ This module performs evaluation of the source code. It evaluates an AST given
 a proof that the type checker has accepted this AST.
 -/
 
-/-- A memory location represented as a natural number. -/
-structure Loc where
-  loc : Nat
-deriving Repr, DecidableEq
-
 /-- The environment maps variable names to memory locations. -/
 abbrev Env := @AList Name (fun _ => Loc)
-/-- The memory maps variable locations to values. -/
-abbrev Memory := @AList Loc (fun _ => Bool)
 /-- The set of freed variables. -/
 abbrev Freed := Finset Name
 
