@@ -96,3 +96,6 @@ def evalStmt
     let loc := AList.get name env (typeCheckStmt_freeNameExists h)
 
     sorry -- TODO: free from memory
+
+def evalProgram (stmt : Stmt) (h : isTypeCheckedStmt stmt Finset.empty) : EvalResult stmt (List.toAList []) :=
+  evalStmt stmt (List.toAList []) (List.toAList []) Finset.empty h
