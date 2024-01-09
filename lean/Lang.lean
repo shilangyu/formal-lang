@@ -3,3 +3,4 @@
 import «Lang».Ast
 import «Lang».Interpreter
 import «Lang».Checker
+import «Lang».Allocator

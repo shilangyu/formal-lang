@@ -8,7 +8,7 @@ import Mathlib.Data.Finset.Basic
 This module stores helper lemmas, functions, utils, etc.
 -/
 
-/-! ## Functions -/
+/-! ## Definitions -/
 
 instance AListToString [Repr α] [∀ a, Repr (β a)] : ToString (@AList α β) where
   toString l := "{" ++ (l.entries |> List.map (fun e => s!"{reprStr e.fst}: {reprStr e.snd}") |> String.intercalate ", ") ++ "}"
@@ -52,12 +52,24 @@ def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ as
     · simp only [true_and, *]
       apply Option.some_eq_some.mp h.symm
     · case _ ht =>
-      simp only [ht, false_and]
-      assumption
+      contradiction
   · intro h
     split
     · apply Option.some_eq_some.mpr h.2.symm
     · simp [*] at h
+
+@[simp] lemma Option.eqSome_else {p : Prop} {_ : Decidable p} : (if p then none else some v) = some t ↔ ¬p ∧ t = v := by
+  apply Iff.intro
+  · intro h
+    split at h
+    · contradiction
+    · case _ ht =>
+      simp only [ht, not_false_eq_true, true_and]
+      apply Option.some_eq_some.mp h.symm
+  · intro h
+    split
+    · case _ ht => exact h.1 ht
+    · apply Option.some_eq_some.mpr h.2.symm
 
 @[simp] lemma Option.isNone_false_isSome : Option.isNone o = false ↔ Option.isSome o := by
   cases o <;> simp only [isNone_none, isSome_none, isNone_some, isSome_some]
