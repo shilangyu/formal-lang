@@ -136,19 +136,30 @@ object Proofs {
           noEmptyEnvStackExprEval(cond, state)
         case Seq(stmt1, stmt2) =>
           noEmptyStackStmtEval1(stmt1, state, blocks)
+          evalStmt1Consistency(stmt1, state, blocks)
+          Interpreter.evalStmt1(stmt1, state, blocks) match
+            case Left(content) => ()
+            case Right(conf)   =>
+              conf match
+                case St(nstate)          =>
+                  assert(stateIsConsistent(nstate, blocks))
+                case Cmd(nstmt1, nstate) =>
+                  assert(stmtAndStateAreConsistent(nstmt1, nstate, blocks))
         case Free(name)        => ()
         case _Block(stmt0)     =>
           noEmptyStackStmtEval1(stmt0, state, blocks + 1)
           evalStmt1Consistency(stmt0, state, blocks + 1)
           Interpreter.evalStmt1(stmt0, state, blocks + 1) match
-            case Left(b)     =>
-              assert(!b.contains(LangException._EmptyEnvStack))
-            case Right(conf) =>
+            case Left(content) => assert(!content.contains(LangException._EmptyEnvStack))
+            case Right(conf)   =>
               conf match
                 case St(nstate)          =>
+                  assert(stateIsConsistent(nstate, blocks + 1))
                   assert(nstate.envs.size == blocks + 2)
                   assert(nstate.envs.tail.size == blocks + 1)
-                case Cmd(nstmt0, nstate) => ()
+                  assert(envStackInclusion(nstate.envs.tail.head, nstate.envs.tail.tail))
+                case Cmd(nstmt0, nstate) =>
+                  assert(stmtAndStateAreConsistent(nstmt0, nstate, blocks + 1))
     }.ensuring(
       Interpreter.evalStmt1(stmt, state, blocks) match
         case Right(conf)      => true
@@ -404,7 +415,7 @@ object Proofs {
      * increase by one at every interpretation step. */
     def locIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val State(scopes, mem, loc) = state
+      val State(envs, mem, freed, loc) = state
 
       require(!mem.contains(loc))
       stmt match
@@ -437,7 +448,7 @@ object Proofs {
     /* Loc increses by one with a declaration */
     def locIncreasesWithDecl(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val State(scopes, mem, loc) = state
+      val State(envs, mem, freed, loc) = state
       stmt match
         case Decl(_, _)    =>
           Interpreter.evalStmt1(stmt, state, blocks) match

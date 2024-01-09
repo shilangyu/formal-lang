@@ -1,11 +1,10 @@
 package lang
 
+import Expr.*
+import Stmt.*
 import stainless.*
 import stainless.collection.*
 import stainless.lang.*
-
-import Expr.*
-import Stmt.*
 
 object Checker {
 
@@ -50,6 +49,42 @@ object Checker {
       case _Block(stmt0)     =>
         val (b, _) = stmtHasNoRedeclarations(stmt0, env)
         (b, env)
+    }
+
+  def exprHasNoUseAfterFree(expr: Expr, freed: Set[Name]): Boolean = expr match {
+    case True              => true
+    case False             => true
+    case Nand(left, right) =>
+      exprHasNoUseAfterFree(left, freed) && exprHasNoUseAfterFree(right, freed)
+    case Ident(name)       => !freed.contains(name)
+  }
+
+  def stmtHasNoUseAfterFree(
+      stmt: Stmt,
+      env: Set[Name],
+      freed: Set[Name]
+  ): (Boolean, Set[Name], Set[Name]) =
+    stmt match {
+      case Decl(name, value) => (exprHasNoUseAfterFree(value, freed), env + name, freed)
+      case Assign(to, value) =>
+        (!freed.contains(to) && exprHasNoUseAfterFree(value, freed), env, freed)
+      case If(cond, body)    =>
+        val (b, benv, bfreed) = stmtHasNoUseAfterFree(body, env, freed)
+        (
+          exprHasNoUseAfterFree(cond, freed) && b,
+          env,
+          // Conservatively assuming the If will always run. We ignore frees of
+          // local variables as those are from a no longer existing scope.
+          bfreed -- (benv -- env)
+        )
+      case Seq(stmt1, stmt2) =>
+        val (s1, menv, mfreed) = stmtHasNoUseAfterFree(stmt1, env, freed)
+        val (s2, nenv, nfreed) = stmtHasNoUseAfterFree(stmt2, menv, mfreed)
+        (s1 && s2, nenv, nfreed)
+      case Free(name)        => (!freed.contains(name), env, freed + name)
+      case _Block(stmt0)     =>
+        val (b, nenv, nfreed) = stmtHasNoUseAfterFree(stmt0, env, freed)
+        (b, env, nfreed -- (nenv -- env))
     }
 
   // ---
