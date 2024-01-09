@@ -404,7 +404,7 @@ object Proofs {
      * increase by one at every interpretation step. */
     def locIncreasesByOne(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val State(scopes, mem, loc) = state
+      val State(envs, mem, freed, loc) = state
 
       require(!mem.contains(loc))
       stmt match
@@ -437,7 +437,7 @@ object Proofs {
     /* Loc increses by one with a declaration */
     def locIncreasesWithDecl(stmt: Stmt, state: State, blocks: BigInt): Unit = {
       decreases(stmt)
-      val State(scopes, mem, loc) = state
+      val State(envs, mem, freed, loc) = state
       stmt match
         case Decl(_, _)    =>
           Interpreter.evalStmt1(stmt, state, blocks) match

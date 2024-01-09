@@ -9,7 +9,7 @@ type Loc = BigInt
 type Env = Map[Name, Loc]
 type Mem = Map[Loc, Boolean]
 
-case class State(val envs: List[Env], val mem: Mem, val nextLoc: Loc)
+case class State(val envs: List[Env], val mem: Mem, val freed: Set[Name], val nextLoc: Loc)
 
 enum Conf:
   case St(state: State)
@@ -28,6 +28,7 @@ enum LangException:
   case RedeclaredVariable
 
   case InvalidLoc
+  case UseAfterFree
 
 // ---
 // Some axiomatized properties to relate a map and a set.
