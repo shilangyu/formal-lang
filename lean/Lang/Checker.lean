@@ -117,6 +117,18 @@ lemma typeCheckStmt_declValue (h : isTypeCheckedStmt (Stmt.decl name value) vars
     · simp only [ht, ite_false, Option.isSome_none] at h
   ·  simp only [hn, ite_false, Option.isSome_none] at h
 
+/-- If Stmt.decl is type checked, then the name has not been declared before. -/
+lemma typeCheckStmt_declNoRedecl (h : isTypeCheckedStmt (Stmt.decl name value) vars) : name ∉ vars := by
+  rw [isTypeCheckedStmt] at h
+  unfold typeCheckStmt at h
+  by_cases hn : name ∉ vars
+  · simp only [hn, ite_false, Option.isSome_none, not_false_eq_true, ite_true, Option.isSome_some] at h
+    by_cases ht : typeCheckExpr value vars
+    · simp only [ht, ite_true, Option.isSome_some] at h
+      assumption
+    · simp only [ht, ite_false, Option.isSome_none] at h
+  ·  simp only [hn, ite_false, Option.isSome_none] at h
+
 /-- If Stmt.assign is type checked, then the name exists in the `vars` set. -/
 lemma typeCheckStmt_targetExists (h : isTypeCheckedStmt (Stmt.assign target value) vars) : target ∈ vars := by
   rw [isTypeCheckedStmt] at h

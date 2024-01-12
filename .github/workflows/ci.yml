@@ -49,9 +49,10 @@ jobs:
         working-directory: lang/
         run: scalafmt --test
 
-      - name: Run tests
-        working-directory: lang/
-        run: sbt test
+      # stainless can't seem to run in CI
+      # - name: Run tests
+      #   working-directory: lang/
+      #   run: sbt test
 
       # left out, takes an hour to compile mathlib
       # - name: Build Lean project
