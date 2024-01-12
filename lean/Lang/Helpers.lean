@@ -14,7 +14,7 @@ instance AListToString [Repr α] [∀ a, Repr (β a)] : ToString (@AList α β) 
   toString l := "{" ++ (l.entries |> List.map (fun e => s!"{reprStr e.fst}: {reprStr e.snd}") |> String.intercalate ", ") ++ "}"
 
 /-- Returns a finite set of keys of an association list. -/
-def keySet {α : Type} {β : α → Type} (a : @AList α β) : Finset α :=
+def keySet {α : Type} {β : α → Type} (a : AList β) : Finset α :=
   Finset.mk (Multiset.ofList a.keys) a.nodupKeys
 
 /-- Given a proof that key ∈ assocList, lookups the key without fail. -/
@@ -56,7 +56,7 @@ def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ as
   · intro h
     split
     · apply Option.some_eq_some.mpr h.2.symm
-    · simp [*] at h
+    · case _ ht => exact ht h.1
 
 @[simp] lemma Option.eqSome_else {p : Prop} {_ : Decidable p} : (if p then none else some v) = some t ↔ ¬p ∧ t = v := by
   apply Iff.intro
@@ -73,3 +73,38 @@ def AList.get [DecidableEq α] (key : α) (assocList : AList β) (h : key ∈ as
 
 @[simp] lemma Option.isNone_false_isSome : Option.isNone o = false ↔ Option.isSome o := by
   cases o <;> simp only [isNone_none, isSome_none, isNone_some, isSome_some]
+
+@[simp] private lemma List.notIn_cons (h : a ∉ b :: bs) : a ∉ bs := by
+  simp only [Bool.not_eq_true, mem_cons] at h
+  intro p
+  exact h (Or.inr p)
+
+@[simp] private lemma List.erase_notIn {a : α} {l : List α} {_ : DecidableEq α} (h : a ∉ l) : List.erase l a = l := by
+  unfold List.erase
+  split
+  · rfl
+  · split
+    · simp_all only [List.mem_cons, beq_iff_eq, true_or, not_true_eq_false]
+    · simp only [List.cons.injEq, true_and]
+      exact (List.erase_notIn (List.notIn_cons h))
+
+@[simp] lemma AList.insert_set_preservation {_ : DecidableEq α} {map : AList β} {key : α} {value : β key} : Insert.insert key (keySet map) = keySet (AList.insert key value map) := by
+  unfold keySet
+  unfold Insert.insert
+  unfold Finset.instInsertFinset
+  simp only [Finset.mem_val, Multiset.mem_coe, Multiset.coe_ndinsert, keys_insert, Finset.mk.injEq,
+    Multiset.coe_eq_coe]
+
+  by_cases key ∈ (keys map)
+  · case _ h =>
+    have t := List.perm_cons_erase h
+    apply List.Perm.symm
+    apply (List.Perm.trans t.symm)
+    unfold Insert.insert
+    unfold List.instInsertList
+    simp only [h, List.mem_cons, or_true, not_true_eq_false, List.insert_of_mem, List.Perm.refl]
+  · case _ h =>
+    rewrite [List.erase_notIn h]
+    unfold Insert.insert
+    unfold List.instInsertList
+    simp only [h, List.mem_cons, or_false, not_false_eq_true, List.insert_of_not_mem, List.Perm.refl]
