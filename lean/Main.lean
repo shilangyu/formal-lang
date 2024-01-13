@@ -7,7 +7,7 @@ def main : IO Unit := do
   let program := Stmt.seq (Stmt.decl (Name.mk "myVar1") Expr.true) (Stmt.conditional Expr.false (Stmt.decl (Name.mk "myVar2") Expr.false))
 
   if h : isTypeCheckedProgram program then {
-    let ⟨env, mem, _, _⟩ := evalProgram program h
+    let ⟨env, mem, _, _, _⟩ := evalProgram program h
     println! env
     println! mem
   } else
